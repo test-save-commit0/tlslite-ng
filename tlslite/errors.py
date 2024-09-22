@@ -1,13 +1,7 @@
-# Authors: 
-#   Trevor Perrin
-#   Dave Baggett (Arcode Corporation) - Added TLSUnsupportedError.
-#
-# See the LICENSE file for legal information regarding use of this file.
-
 """Exception classes."""
 import socket
-
 from .constants import AlertDescription, AlertLevel
+
 
 class BaseTLSException(Exception):
     """
@@ -17,13 +11,11 @@ class BaseTLSException(Exception):
     caught by tlslite
     consumers
     """
-
     pass
 
 
 class EncryptionError(BaseTLSException):
     """Base class for exceptions thrown while encrypting."""
-
     pass
 
 
@@ -37,7 +29,6 @@ class TLSError(BaseTLSException):
 
 class TLSClosedConnectionError(TLSError, socket.error):
     """An attempt was made to use the connection after it was closed."""
-
     pass
 
 
@@ -50,13 +41,11 @@ class TLSAbruptCloseError(TLSError):
     to truncate the connection.  It could also signify a misbehaving
     TLS implementation, or a random network failure.
     """
-
     pass
 
 
 class TLSAlert(TLSError):
     """A TLS alert has been signalled."""
-
     pass
 
 
@@ -83,7 +72,7 @@ class TLSLocalAlert(TLSAlert):
     def __str__(self):
         alertStr = AlertDescription.toStr(self.description)
         if self.message:
-            return alertStr + ": " + self.message
+            return alertStr + ': ' + self.message
         else:
             return alertStr
 
@@ -122,35 +111,30 @@ class TLSAuthenticationError(TLSError):
     the Checker objects to how the other party authenticated, a
     subclass of this exception will be raised.
     """
-
     pass
 
 
 class TLSNoAuthenticationError(TLSAuthenticationError):
     """The Checker was expecting the other party to authenticate with a
     certificate chain, but this did not occur."""
-
     pass
 
 
 class TLSAuthenticationTypeError(TLSAuthenticationError):
     """The Checker was expecting the other party to authenticate with a
     different type of certificate chain."""
-
     pass
 
 
 class TLSFingerprintError(TLSAuthenticationError):
     """The Checker was expecting the other party to authenticate with a
     certificate chain that matches a different fingerprint."""
-
     pass
 
 
 class TLSAuthorizationError(TLSAuthenticationError):
     """The Checker was expecting the other party to authenticate with a
     certificate chain that has a different authorization."""
-
     pass
 
 
@@ -159,7 +143,6 @@ class TLSValidationError(TLSAuthenticationError):
     chain is invalid."""
 
     def __init__(self, msg, info=None):
-        # Include a dict containing info about this validation failure
         TLSAuthenticationError.__init__(self, msg)
         self.info = info
 
@@ -172,14 +155,12 @@ class TLSFaultError(TLSError):
     set to induce some sort of
     faulty behavior, and the other party doesn't respond appropriately.
     """
-
     pass
 
 
 class TLSUnsupportedError(TLSError):
     """The implementation doesn't support the requested (or required)
     capabilities."""
-
     pass
 
 
@@ -188,25 +169,21 @@ class TLSInternalError(TLSError):
 
     Caused by incorrect use of API.
     """
-
     pass
 
 
 class TLSProtocolException(BaseTLSException):
     """Exceptions used internally for handling errors in received messages"""
-
     pass
 
 
 class TLSIllegalParameterException(TLSProtocolException):
     """Parameters specified in message were incorrect or invalid"""
-
     pass
 
 
 class TLSDecodeError(TLSProtocolException):
     """The received message encoding does not match specification."""
-
     pass
 
 
@@ -215,71 +192,59 @@ class TLSUnexpectedMessage(TLSProtocolException):
     The received message was unexpected or parsing of Inner Plaintext
     failed
     """
-
     pass
 
 
 class TLSRecordOverflow(TLSProtocolException):
     """The received record size was too big"""
-
     pass
 
 
 class TLSDecryptionFailed(TLSProtocolException):
     """Decryption of data was unsuccessful"""
-
     pass
 
 
 class TLSBadRecordMAC(TLSProtocolException):
     """Bad MAC (or padding in case of mac-then-encrypt)"""
-
     pass
 
 
 class TLSInsufficientSecurity(TLSProtocolException):
     """Parameters selected by user are too weak"""
-
     pass
 
 
 class TLSUnknownPSKIdentity(TLSProtocolException):
     """The PSK or SRP identity is unknown"""
-
     pass
 
 
 class TLSHandshakeFailure(TLSProtocolException):
     """Could not find acceptable set of handshake parameters"""
-
     pass
 
 
 class MaskTooLongError(EncryptionError):
     """The maskLen passed into function is too high"""
-
     pass
 
 
 class MessageTooLongError(EncryptionError):
     """The message passed into function is too long"""
-
     pass
 
 
 class EncodingError(EncryptionError):
     """An error appeared while encoding"""
-
     pass
 
 
 class InvalidSignature(EncryptionError):
     """Verification function found invalid signature"""
-
     pass
 
 
 class UnknownRSAType(EncryptionError):
     """Unknown RSA algorithm type passed"""
-
     pass

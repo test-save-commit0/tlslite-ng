@@ -1,10 +1,4 @@
-# Authors:
-#   Esteban Sanchez (FosanzDev) - python 3.12 port
-#
-# See the LICENSE file for legal information regarding use of this file.
-
 """TLS Lite + asyncio."""
-
 import asyncio
 from tlslite.tlsconnection import TLSConnection
 from .asyncstatemachine import AsyncStateMachine
@@ -88,82 +82,44 @@ class TLSAsyncioDispatcherMixIn(asyncio.Protocol):
 
     def _get_sibling_class(self):
         """Get the sibling class that this class is mixed in with."""
-        for cl in self.__class__.__bases__:
-            if cl not in (TLSAsyncioDispatcherMixIn, AsyncStateMachine):
-                return cl
-        raise AssertionError()
-
-    def connection_made(self, transport):
-        self.transport = transport
-        # Call the sibling class's connection_made method
-        if hasattr(self.sibling_class, 'connection_made'):
-            self.sibling_class.connection_made(transport)
-
-    def data_received(self, data):
-        self.read_buffer = data
-        if hasattr(self.sibling_class, 'data_received'):
-            self.sibling_class.data_received(self, data)
-
-    def connection_lost(self, exc):
-        self.sibling_class.connection_lost(self, exc)
-        if hasattr(self, "tls_connection"):
-            self.set_close_op()
-        else:
-            self.transport.close()
+        pass
 
     def readable(self):
         """Check if the protocol is ready for reading."""
-        result = self.wants_read_event()
-        return result if result is not None \
-            else self.sibling_class.readable(self)
+        pass
 
     def writable(self):
         """Check if the protocol is ready for writing."""
-        result = self.wants_write_event()
-        return result if result is not None \
-            else self.sibling_class.writable(self)
+        pass
 
     def handle_read(self):
         """Handle a read event."""
-        self.in_read_event()
+        pass
 
     def handle_write(self):
         """Handle a write event."""
-        self.in_write_event()
+        pass
 
     def out_connect_event(self):
         """Handle an outgoing connect event."""
-        self.sibling_class.handle_connect(self)
+        pass
 
     def out_close_event(self):
         """Handle an outgoing close event."""
-        self.transport.close()
+        pass
 
     def out_read_event(self, read_buffer):
         """Handle an outgoing read event."""
-        self.read_buffer = read_buffer
-        self.sibling_class.handle_read(self)
+        pass
 
     def out_write_event(self):
         """Handle an outgoing write event."""
-        self.sibling_class.handle_write(self)
+        pass
 
     def recv(self, buffer_size=16384):
         """Receive data."""
-        if buffer_size < 16384 or self.read_buffer is None:
-            raise AssertionError()
-        return_value = self.read_buffer
-        self.read_buffer = None
-        return return_value
-
-    def send(self, write_buffer):
-        self.set_write_op(write_buffer)
-        self.transport.write(write_buffer)
-        return len(write_buffer)
+        pass
 
     def close(self):
         """Close the connection."""
-        if hasattr(self, "tls_connection"):
-            self.set_close_op()
-        else:
-            self.transport.close()
+        pass

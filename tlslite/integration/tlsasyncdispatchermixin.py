@@ -1,12 +1,4 @@
-# Authors: 
-#   Trevor Perrin
-#   Martin von Loewis - python 3 port
-#
-# See the LICENSE file for legal information regarding use of this file.
-
 """TLS Lite + asyncore."""
-
-
 import asyncore
 from tlslite.tlsconnection import TLSConnection
 from .asyncstatemachine import AsyncStateMachine
@@ -80,68 +72,13 @@ class TLSAsyncDispatcherMixIn(AsyncStateMachine):
     and removes this instance from the asyncore loop.
     """
 
-
     def __init__(self, sock=None):
         AsyncStateMachine.__init__(self)
-
         if sock:
             self.tlsConnection = TLSConnection(sock)
-
-        #Calculate the sibling I'm being mixed in with.
-        #This is necessary since we override functions
-        #like readable(), handle_read(), etc., but we
-        #also want to call the sibling's versions.
         for cl in self.__class__.__bases__:
             if cl != TLSAsyncDispatcherMixIn and cl != AsyncStateMachine:
                 self.siblingClass = cl
                 break
         else:
             raise AssertionError()
-
-    def readable(self):
-        result = self.wantsReadEvent()
-        if result != None:
-            return result
-        return self.siblingClass.readable(self)
-
-    def writable(self):
-        result = self.wantsWriteEvent()
-        if result != None:
-            return result
-        return self.siblingClass.writable(self)
-
-    def handle_read(self):
-        self.inReadEvent()
-
-    def handle_write(self):
-        self.inWriteEvent()
-
-    def outConnectEvent(self):
-        self.siblingClass.handle_connect(self)
-
-    def outCloseEvent(self):
-        asyncore.dispatcher.close(self)
-
-    def outReadEvent(self, readBuffer):
-        self.readBuffer = readBuffer
-        self.siblingClass.handle_read(self)
-
-    def outWriteEvent(self):
-        self.siblingClass.handle_write(self)
-
-    def recv(self, bufferSize=16384):
-        if bufferSize < 16384 or self.readBuffer == None:
-            raise AssertionError()
-        returnValue = self.readBuffer
-        self.readBuffer = None
-        return returnValue
-
-    def send(self, writeBuffer):
-        self.setWriteOp(writeBuffer)
-        return len(writeBuffer)
-
-    def close(self):
-        if hasattr(self, "tlsConnection"):
-            self.setCloseOp()
-        else:
-            asyncore.dispatcher.close(self)

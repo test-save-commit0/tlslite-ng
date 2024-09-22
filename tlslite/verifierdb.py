@@ -1,12 +1,9 @@
-# Author: Trevor Perrin
-# See the LICENSE file for legal information regarding use of this file.
-
 """Class for storing SRP password verifiers."""
-
 from .utils.cryptomath import *
 from .utils.compat import *
 from tlslite import mathtls
 from .basedb import BaseDB
+
 
 class VerifierDB(BaseDB):
     """This class represent an in-memory or on-disk database of SRP
@@ -17,6 +14,7 @@ class VerifierDB(BaseDB):
 
     This class is thread-safe.
     """
+
     def __init__(self, filename=None):
         """Create a new VerifierDB instance.
 
@@ -26,15 +24,7 @@ class VerifierDB(BaseDB):
             this with a call to open().  To create a new on-disk database,
             follow this with a call to create().
         """
-        BaseDB.__init__(self, filename, b"verifier")
-
-    def _getItem(self, username, valueStr):
-        (N, g, salt, verifier) = valueStr.split(b" ")
-        N = bytesToNumber(a2b_base64(N))
-        g = bytesToNumber(a2b_base64(g))
-        salt = a2b_base64(salt)
-        verifier = bytesToNumber(a2b_base64(verifier))
-        return (N, g, salt, verifier)
+        BaseDB.__init__(self, filename, b'verifier')
 
     def __setitem__(self, username, verifierEntry):
         """Add a verifier entry to the database.
@@ -50,24 +40,6 @@ class VerifierDB(BaseDB):
             verifier entry.
         """
         BaseDB.__setitem__(self, username, verifierEntry)
-
-
-    def _setItem(self, username, value):
-        if len(username)>=256:
-            raise ValueError("username too long")
-        N, g, salt, verifier = value
-        N = b2a_base64(numberToByteArray(N)).encode("ascii")
-        g = b2a_base64(numberToByteArray(g)).encode("ascii")
-        salt = b2a_base64(salt).encode("ascii")
-        verifier = b2a_base64(numberToByteArray(verifier)).encode("ascii")
-        valueStr = b" ".join((N, g, salt, verifier))
-        return valueStr
-
-    def _checkItem(self, value, username, param):
-        (N, g, salt, verifier) = value
-        x = mathtls.makeX(salt, username, param)
-        v = powMod(g, x, N)
-        return (verifier == v)
 
     @staticmethod
     def makeVerifier(username, password, bits):
@@ -89,12 +61,4 @@ class VerifierDB(BaseDB):
         :rtype: tuple
         :returns: A tuple which may be stored in a VerifierDB.
         """
-        if isinstance(username, str):
-            usernameBytes = bytearray(username, "utf-8")
-        else:
-            usernameBytes = bytearray(username)
-        if isinstance(password, str):
-            passwordBytes = bytearray(password, "utf-8")
-        else:
-            passwordBytes = bytearray(password)
-        return mathtls.makeVerifier(usernameBytes, passwordBytes, bits)
+        pass

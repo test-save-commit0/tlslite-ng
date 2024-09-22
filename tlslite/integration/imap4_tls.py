@@ -1,24 +1,17 @@
-# Author: Trevor Perrin
-# See the LICENSE file for legal information regarding use of this file.
-
 """TLS Lite + imaplib."""
-
 import socket
 from imaplib import IMAP4
 from tlslite.tlsconnection import TLSConnection
 from tlslite.integration.clienthelper import ClientHelper
-
-# IMAP TLS PORT
 IMAP4_TLS_PORT = 993
+
 
 class IMAP4_TLS(IMAP4, ClientHelper):
     """This class extends :py:class:`imaplib.IMAP4` with TLS support."""
 
-    def __init__(self, host = '', port = IMAP4_TLS_PORT,
-                 username=None, password=None,
-                 certChain=None, privateKey=None,
-                 checker=None,
-                 settings=None):
+    def __init__(self, host='', port=IMAP4_TLS_PORT, username=None,
+        password=None, certChain=None, privateKey=None, checker=None,
+        settings=None):
         """Create a new IMAP4_TLS.
 
         For client authentication, use one of these argument
@@ -73,30 +66,14 @@ class IMAP4_TLS(IMAP4, ClientHelper):
             the ciphersuites, certificate types, and SSL/TLS versions
             offered by the client.
         """
-
-        ClientHelper.__init__(self,
-                 username, password,
-                 certChain, privateKey,
-                 checker,
-                 settings)
-
+        ClientHelper.__init__(self, username, password, certChain,
+            privateKey, checker, settings)
         IMAP4.__init__(self, host, port)
 
-    # the `timeout` is a new argument in python3.9, so checks with
-    # older python versions will complain about unmatched parameters
-    # pylint: disable=arguments-differ
     def open(self, host='', port=IMAP4_TLS_PORT, timeout=None):
         """Setup connection to remote server on "host:port".
 
         This connection will be used by the routines:
         read, readline, send, shutdown.
         """
-        del timeout
-        self.host = host
-        self.port = port
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((host, port))
-        self.sock = TLSConnection(self.sock)
-        ClientHelper._handshake(self, self.sock)
-        self.file = self.sock.makefile('rb')
-    # pylint: enable=arguments-differ
+        pass

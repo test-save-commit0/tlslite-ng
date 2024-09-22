@@ -1,6 +1,3 @@
-# Author: Hubert Kario
-# See the LICENSE file for legal information regarding use of this file.
-
 """Abstract class for EdDSA."""
 
 
@@ -16,6 +13,7 @@ class EdDSAKey(object):
     directly.  Instead, use the factory functions in
     :py:class:`~tlslite.utils.keyfactory`.
     """
+
     def __len__(self):
         """Return the size of the order of the curve of this key, in bits.
 
@@ -28,13 +26,7 @@ class EdDSAKey(object):
 
         :rtype: bool
         """
-        raise NotImplementedError()
-
-    def _hashAndSign(self, data):
-        raise NotImplementedError()
-
-    def _hashAndVerify(self, signature, data):
-        raise NotImplementedError()
+        pass
 
     def hashAndSign(self, data, rsaScheme=None, hAlg=None, sLen=None):
         """Hash and sign the passed-in bytes.
@@ -57,10 +49,10 @@ class EdDSAKey(object):
         :rtype: bytearray
         :returns: An EdDSA signature on the passed-in data.
         """
-        return self._hashAndSign(data)
+        pass
 
     def hashAndVerify(self, sig_bytes, data, rsaScheme=None, hAlg=None,
-                      sLen=None):
+        sLen=None):
         """Hash and verify the passed-in bytes with the signature.
 
         This verifies an EdDSA signature on the passed-in data
@@ -84,10 +76,10 @@ class EdDSAKey(object):
         :rtype: bool
         :returns: Whether the signature matches the passed-in data.
         """
-        return self._hashAndVerify(sig_bytes, data)
+        pass
 
     @staticmethod
-    def sign(self, bytes, padding=None, hashAlg="sha1", saltLen=None):
+    def sign(self, bytes, padding=None, hashAlg='sha1', saltLen=None):
         """Sign the passed-in bytes.
 
         Note: this method is unsupported for EdDSA keys, as pre-hash
@@ -106,12 +98,11 @@ class EdDSAKey(object):
         :type saltLen: int
         :param saltLen: Ignored
         """
-        raise TypeError("Only Pure EdDSA signatures are supported, use "
-                        "hashAndSign() instead.")
+        pass
 
     @staticmethod
-    def verify(self, sigBytes, bytes, padding=None, hashAlg=None,
-               saltLen=None):
+    def verify(self, sigBytes, bytes, padding=None, hashAlg=None, saltLen=None
+        ):
         """Verify the passed-in bytes with the signature.
 
         Note: this method is unsupported for EdDSA keys, as pre-hash
@@ -127,8 +118,7 @@ class EdDSAKey(object):
         :type padding: str
         :param padding: Ignored
         """
-        raise TypeError("Only Pure EdDSA signatures are supported, use "
-                        "hashAndVerify() instead.")
+        pass
 
     def acceptsPassword(self):
         """Return True if the write() method accepts a password for use
@@ -136,7 +126,7 @@ class EdDSAKey(object):
 
         :rtype: bool
         """
-        raise NotImplementedError()
+        pass
 
     def write(self, password=None):
         """Return a string containing the key.
@@ -145,7 +135,7 @@ class EdDSAKey(object):
         :returns: A string describing the key, in whichever format (PEM)
             is native to the implementation.
         """
-        raise NotImplementedError()
+        pass
 
     @staticmethod
     def generate(bits):
@@ -153,4 +143,4 @@ class EdDSAKey(object):
 
         :rtype: ~tlslite.utils.EdDSAKey.EdDSAKey
         """
-        raise NotImplementedError()
+        pass

@@ -1,10 +1,4 @@
-# Authors:
-#   Hubert Kario (2016)
-#
-# See the LICENSE file for legal information regarding use of this file.
-
 """Helper functions for handling lists"""
-
 from itertools import chain
 
 
@@ -21,13 +15,10 @@ def getFirstMatching(values, matches):
     :type matches: collections.abc.Container
     :param matches: list of items to check against
     """
-    assert matches is not None
-    if not values:
-        return None
-    return next((i for i in values if i in matches), None)
+    pass
 
 
-def to_str_delimiter(values, delim=", ", last_delim=" or "):
+def to_str_delimiter(values, delim=', ', last_delim=' or '):
     """
     Format the list as a human readable string.
 
@@ -43,7 +34,4 @@ def to_str_delimiter(values, delim=", ", last_delim=" or "):
     :param last_delim: delimiter for last object in list
     :rtype: str
     """
-    # we need to slice the iterator, so we need a copy
-    values = list(values)
-    return delim.join(chain((str(i) for i in values[:-2]),
-                            [last_delim.join(str(i) for i in values[-2:])]))
+    pass

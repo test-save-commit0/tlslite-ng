@@ -1,10 +1,4 @@
-# Author: Trevor Perrin
-# Patch from Google adding getChildBytes()
-#
-# See the LICENSE file for legal information regarding use of this file.
-
 """Abstract Syntax Notation One (ASN.1) parsing"""
-
 from .codec import Parser
 
 
@@ -51,14 +45,8 @@ class ASN1Parser(object):
         :param bytes: DER encoded ASN.1 object
         """
         p = Parser(bytes)
-
-        # Get Type
         self.type = self._parse_type(p)
-
-        #Get Length
         self.length = self._getASN1Length(p)
-
-        #Get Value
         self.value = p.getFixBytes(self.length)
 
     def getChild(self, which):
@@ -71,7 +59,7 @@ class ASN1Parser(object):
         :rtype: ASN1Parser
         :returns: decoded child object
         """
-        return ASN1Parser(self.getChildBytes(which))
+        pass
 
     def getChildCount(self):
         """
@@ -80,16 +68,7 @@ class ASN1Parser(object):
         :rtype: int
         :returns: number of children in the object
         """
-        p = Parser(self.value)
-        count = 0
-        while True:
-            if p.getRemainingLength() == 0:
-                break
-            p.skip_bytes(1)  # skip Type
-            length = self._getASN1Length(p)
-            p.skip_bytes(length)  # skip value
-            count += 1
-        return count
+        pass
 
     def getChildBytes(self, which):
         """
@@ -101,40 +80,14 @@ class ASN1Parser(object):
         :rtype: bytearray
         :returns: raw child object
         """
-        p = Parser(self.value)
-        for _ in range(which+1):
-            markIndex = p.index
-            p.skip_bytes(1)  # skip Type
-            length = self._getASN1Length(p)
-            p.skip_bytes(length)
-        return p.bytes[markIndex : p.index]
+        pass
 
     @staticmethod
     def _getASN1Length(p):
         """Decode the ASN.1 DER length field"""
-        firstLength = p.get(1)
-        if firstLength <= 127:
-            return firstLength
-        else:
-            lengthLength = firstLength & 0x7F
-            return p.get(lengthLength)
+        pass
 
     @staticmethod
     def _parse_type(parser):
         """Decode the ASN.1 DER type field"""
-        header = parser.get(1)
-        tag_class = (header & 0xc0) >> 6
-        tag_is_primitive = (header & 0x20) >> 5
-        tag_id = header & 0x1f
-
-        if tag_id == 0x1f:
-            tag_id = 0
-            while True:
-                value = parser.get(1)
-                tag_id += value & 0x7f
-                if not value & 0x80:
-                    break
-                tag_id <<= 7
-
-        asn1type = ASN1Type(tag_class, tag_is_primitive, tag_id)
-        return asn1type
+        pass

@@ -1,31 +1,23 @@
-# Author: Hubert Kario (c) 2019
-# see LICENCE file for legal information regarding use of this file
-
 """
 HMAC module that works in FIPS mode.
 
 Note that this makes this code FIPS non-compliant!
 """
-
-# Because we are extending the hashlib module, we need to import all its
-# fields to suppport the same uses
 from . import tlshashlib
 from .compat import compatHMAC
 try:
     from hmac import compare_digest
-    __all__ = ["new", "compare_digest", "HMAC"]
+    __all__ = ['new', 'compare_digest', 'HMAC']
 except ImportError:
-    __all__ = ["new", "HMAC"]
-
+    __all__ = ['new', 'HMAC']
 try:
     from hmac import HMAC, new
-    # if we can calculate HMAC on MD5, then use the built-in HMAC
-    # implementation
     _val = HMAC(b'some key', b'msg', 'md5')
     _val.digest()
     del _val
 except Exception:
-    # fallback only when MD5 doesn't work
+
+
     class HMAC(object):
         """Hacked version of HMAC that works in FIPS mode even with MD5."""
 
@@ -53,8 +45,8 @@ except Exception:
             if len(key) < self.block_size:
                 key = key + b'\x00' * (self.block_size - len(key))
             key = bytearray(key)
-            ipad = bytearray(b'\x36' * self.block_size)
-            opad = bytearray(b'\x5c' * self.block_size)
+            ipad = bytearray(b'6' * self.block_size)
+            opad = bytearray(b'\\' * self.block_size)
             i_key = bytearray(i ^ j for i, j in zip(key, ipad))
             self._o_key = bytearray(i ^ j for i, j in zip(key, opad))
             self._context = digestmod.copy()
@@ -62,27 +54,6 @@ except Exception:
             if msg:
                 self._context.update(compatHMAC(msg))
 
-        def update(self, msg):
-            self._context.update(compatHMAC(msg))
-
-        def digest(self):
-            i_digest = self._context.digest()
-            o_hash = self.digestmod.copy()
-            o_hash.update(compatHMAC(self._o_key))
-            o_hash.update(compatHMAC(i_digest))
-            return o_hash.digest()
-
-        def copy(self):
-            new = HMAC.__new__(HMAC)
-            new.key = self.key
-            new.digestmod = self.digestmod
-            new.block_size = self.block_size
-            new.digest_size = self.digest_size
-            new._o_key = self._o_key
-            new._context = self._context.copy()
-            return new
-
-
     def new(*args, **kwargs):
         """General constructor that works in FIPS mode."""
-        return HMAC(*args, **kwargs)
+        pass

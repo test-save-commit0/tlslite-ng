@@ -1,9 +1,6 @@
-# Author: Trevor Perrin
-# See the LICENSE file for legal information regarding use of this file.
-
 """TLS Lite + SocketServer."""
-
 from tlslite.tlsconnection import TLSConnection
+
 
 class TLSSocketServerMixIn:
     """
@@ -48,15 +45,3 @@ class TLSSocketServerMixIn:
         httpd = MyHTTPServer(('localhost', 443), SimpleHTTPRequestHandler)
         httpd.serve_forever()
     """
-
-
-    def finish_request(self, sock, client_address):
-        tlsConnection = TLSConnection(sock)
-        if self.handshake(tlsConnection) == True:
-            self.RequestHandlerClass(tlsConnection, client_address, self)
-            tlsConnection.close()
-
-    #Implement this method to do some form of handshaking.  Return True
-    #if the handshake finishes properly and the request is authorized.
-    def handshake(self, tlsConnection):
-        raise NotImplementedError()

@@ -1,5 +1,6 @@
 """Abstract class for DSA."""
 
+
 class DSAKey(object):
     """This is an abstract base class for DSA keys.
 
@@ -40,7 +41,7 @@ class DSAKey(object):
 
         :rtype: bool
         """
-        raise NotImplementedError()
+        pass
 
     def hashAndSign(self, data, hAlg):
         """Hash and sign the passed-in bytes.
@@ -58,12 +59,9 @@ class DSAKey(object):
         :rtype: bytearray
         :returns: An DSA signature on the passed-in data.
         """
-        raise NotImplementedError()
+        pass
 
-    def sign(self, data):
-        raise NotImplementedError()
-
-    def hashAndVerify(self, signature, data, hAlg="sha1"):
+    def hashAndVerify(self, signature, data, hAlg='sha1'):
         """Hash and verify the passed-in bytes with signature.
 
         :type signature: ASN1 bytearray
@@ -78,7 +76,7 @@ class DSAKey(object):
         :rtype: bool
         :returns: return True if verification is OK.
         """
-        raise NotImplementedError()
+        pass
 
     @staticmethod
     def generate(L, N):
@@ -93,7 +91,7 @@ class DSAKey(object):
         :rtype: DSAkey
         :returns: DSAkey(domain parameters, private key, public key)
         """
-        raise NotImplementedError()
+        pass
 
     @staticmethod
     def generate_qp(L, N):
@@ -108,4 +106,4 @@ class DSAKey(object):
         :rtype: (int, int)
         :returns: new p and q key parameters
         """
-        raise NotImplementedError()
+        pass

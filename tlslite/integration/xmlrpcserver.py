@@ -1,15 +1,7 @@
-# Authors:
-#   Kees Bos
-#   Martin von Loewis - python 3 port
-#
-# See the LICENSE file for legal information regarding use of this file.
-
 """xmlrpcserver.py - simple XML RPC server supporting TLS."""
-
 try:
     from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
 except ImportError:
-    # Python 3
     from xmlrpc.server import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
 from .tlssocketservermixin import TLSSocketServerMixIn
 
@@ -17,28 +9,16 @@ from .tlssocketservermixin import TLSSocketServerMixIn
 class TLSXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
     """XMLRPCRequestHandler using TLS."""
 
-    # Redefine the setup method (see SocketServer.StreamRequestHandler)
     def setup(self):
         """Setup the connection for TLS."""
-        self.connection = self.request
-        if getattr(self, 'timeout', None) is not None:
-            # Python 2.7
-            self.connection.settimeout(self.timeout)
-        self.rfile = self.connection.makefile('rb', self.rbufsize)
-        self.wfile = self.connection.makefile('wb', self.wbufsize)
+        pass
 
     def do_POST(self):
         """Handle the HTTPS POST request."""
-        SimpleXMLRPCRequestHandler.do_POST(self)
-        try:
-            # shut down the connection
-            self.connection.shutdown()
-        except:
-            pass
+        pass
 
 
-class TLSXMLRPCServer(TLSSocketServerMixIn,
-                      SimpleXMLRPCServer):
+class TLSXMLRPCServer(TLSSocketServerMixIn, SimpleXMLRPCServer):
     """Simple XML-RPC server using TLS."""
 
     def __init__(self, addr, *args, **kwargs):

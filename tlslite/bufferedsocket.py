@@ -1,9 +1,4 @@
-# Copyright (c) 2016, Hubert Kario
-#
-# See the LICENSE file for legal information regarding use of this file.
-
 """Wrapper around the socket.socket interface that provides buffering"""
-
 from collections import deque
 
 
@@ -29,38 +24,23 @@ class BufferedSocket(object):
 
     def send(self, data):
         """Send data to the socket"""
-        if self.buffer_writes:
-            self._write_queue.append(data)
-            return len(data)
-        return self.socket.send(data)
+        pass
 
     def sendall(self, data):
         """Send data to the socket"""
-        if self.buffer_writes:
-            self._write_queue.append(data)
-            return None
-        return self.socket.sendall(data)
+        pass
 
     def flush(self):
         """Send all buffered data"""
-        buf = bytearray()
-        for i in self._write_queue:
-            buf += i
-        self._write_queue.clear()
-        if buf:
-            self.socket.sendall(buf)
+        pass
 
     def recv(self, bufsize):
         """Receive data from socket (socket emulation)"""
-        if not self._read_buffer:
-            self._read_buffer += self.socket.recv(max(4096, bufsize))
-        ret = self._read_buffer[:bufsize]
-        del self._read_buffer[:bufsize]
-        return ret
+        pass
 
     def getsockname(self):
         """Return the socket's own address (socket emulation)."""
-        return self.socket.getsockname()
+        pass
 
     def getpeername(self):
         """
@@ -68,11 +48,11 @@ class BufferedSocket(object):
 
         (socket emulation)
         """
-        return self.socket.getpeername()
+        pass
 
     def settimeout(self, value):
         """Set a timeout on blocking socket operations (socket emulation)."""
-        return self.socket.settimeout(value)
+        pass
 
     def gettimeout(self):
         """
@@ -80,18 +60,16 @@ class BufferedSocket(object):
 
         (socket emulation)
         """
-        return self.socket.gettimeout()
+        pass
 
     def setsockopt(self, level, optname, value):
         """Set the value of the given socket option (socket emulation)."""
-        return self.socket.setsockopt(level, optname, value)
+        pass
 
     def shutdown(self, how):
         """Shutdown the underlying socket."""
-        self.flush()
-        return self.socket.shutdown(how)
+        pass
 
     def close(self):
         """Close the underlying socket."""
-        self.flush()
-        return self.socket.close()
+        pass

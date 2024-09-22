@@ -1,18 +1,8 @@
-# Authors: 
-#   Trevor Perrin
-#   Kees Bos - Added ignoreAbruptClose parameter
-#   Dimitris Moraitis - Anon ciphersuites
-#   Martin von Loewis - python 3 port
-#
-# See the LICENSE file for legal information regarding use of this file.
-
 """TLS Lite + httplib."""
-
 import socket
 try:
     import httplib
 except ImportError:
-    # Python 3
     from http import client as httplib
 from tlslite.tlsconnection import TLSConnection
 from tlslite.integration.clienthelper import ClientHelper
@@ -21,15 +11,10 @@ from tlslite.integration.clienthelper import ClientHelper
 class HTTPTLSConnection(httplib.HTTPConnection, ClientHelper):
     """This class extends L{httplib.HTTPConnection} to support TLS."""
 
-    def __init__(self, host, port=None, strict=None,
-                timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
-                source_address=None,
-                username=None, password=None,
-                certChain=None, privateKey=None,
-                checker=None,
-                settings=None,
-                ignoreAbruptClose=False,
-                anon=False):
+    def __init__(self, host, port=None, strict=None, timeout=socket.
+        _GLOBAL_DEFAULT_TIMEOUT, source_address=None, username=None,
+        password=None, certChain=None, privateKey=None, checker=None,
+        settings=None, ignoreAbruptClose=False, anon=False):
         """Create a new HTTPTLSConnection.
 
         For client authentication, use one of these argument
@@ -94,27 +79,11 @@ class HTTPTLSConnection(httplib.HTTPConnection, ClientHelper):
             unexpected hangup.
         """
         if source_address:
-            httplib.HTTPConnection.__init__(self,
-                    host=host,
-                    port=port,
-                    timeout=timeout,
-                    source_address=source_address)
+            httplib.HTTPConnection.__init__(self, host=host, port=port,
+                timeout=timeout, source_address=source_address)
         if not source_address:
-            httplib.HTTPConnection.__init__(self,
-                    host=host,
-                    port=port,
-                    timeout=timeout)
+            httplib.HTTPConnection.__init__(self, host=host, port=port,
+                timeout=timeout)
         self.ignoreAbruptClose = ignoreAbruptClose
-        ClientHelper.__init__(self,
-                              username, password,
-                              certChain, privateKey,
-                              checker,
-                              settings,
-                              anon,
-                              host)
-
-    def connect(self):
-        httplib.HTTPConnection.connect(self)
-        self.sock = TLSConnection(self.sock)
-        self.sock.ignoreAbruptClose = self.ignoreAbruptClose
-        ClientHelper._handshake(self, self.sock)
+        ClientHelper.__init__(self, username, password, certChain,
+            privateKey, checker, settings, anon, host)

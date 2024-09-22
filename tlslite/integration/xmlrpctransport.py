@@ -1,18 +1,8 @@
-# Authors: 
-#   Trevor Perrin
-#   Kees Bos - Fixes for compatibility with different Python versions
-#   Martin von Loewis - python 3 port
-#
-# See the LICENSE file for legal information regarding use of this file.
-
-
 """TLS Lite + xmlrpclib."""
-
 try:
     import xmlrpclib
     import httplib
 except ImportError:
-    # Python 3
     from xmlrpc import client as xmlrpclib
     from http import client as httplib
 from tlslite.integration.httptlsconnection import HTTPTLSConnection
@@ -22,18 +12,13 @@ import tlslite.errors
 
 class XMLRPCTransport(xmlrpclib.Transport, ClientHelper):
     """Handles an HTTPS transaction to an XML-RPC server."""
-
-    # Pre python 2.7, the make_connection returns a HTTP class
     transport = xmlrpclib.Transport()
     conn_class_is_http = not hasattr(transport, '_connection')
-    del(transport)
+    del transport
 
-    def __init__(self, use_datetime=0,
-                 username=None, password=None,
-                 certChain=None, privateKey=None,
-                 checker=None,
-                 settings=None,
-                 ignoreAbruptClose=False):
+    def __init__(self, use_datetime=0, username=None, password=None,
+        certChain=None, privateKey=None, checker=None, settings=None,
+        ignoreAbruptClose=False):
         """
         Create a new XMLRPCTransport.
 
@@ -102,37 +87,12 @@ class XMLRPCTransport(xmlrpclib.Transport, ClientHelper):
         :param ignoreAbruptClose: ignore the TLSAbruptCloseError on
             unexpected hangup.
         """
-        # self._connection is new in python 2.7, since we're using it here,
-        # we'll add this ourselves too, just in case we're pre-2.7
-        self._connection = (None, None)
+        self._connection = None, None
         xmlrpclib.Transport.__init__(self, use_datetime)
         self.ignoreAbruptClose = ignoreAbruptClose
-        ClientHelper.__init__(self,
-                 username, password, 
-                 certChain, privateKey,
-                 checker,
-                 settings)
+        ClientHelper.__init__(self, username, password, certChain,
+            privateKey, checker, settings)
 
     def make_connection(self, host):
         """Make a connection to `host`. Reuse keepalive connections."""
-        # return an existing connection if possible.  This allows
-        # HTTP/1.1 keep-alive.
-        if self._connection and host == self._connection[0]:
-            http = self._connection[1]
-        else:
-            # create a HTTPS connection object from a host descriptor
-            chost, extra_headers, x509 = self.get_host_info(host)
-
-            http = HTTPTLSConnection(
-                chost, None, username=self.username, password=self.password,
-                certChain=self.certChain, privateKey=self.privateKey,
-                checker=self.checker,
-                settings=self.settings,
-                ignoreAbruptClose=self.ignoreAbruptClose)
-            # store the host argument along with the connection object
-            self._connection = host, http
-        if not self.conn_class_is_http:
-            return http
-        http2 = httplib.HTTP()
-        http2._setup(http)
-        return http2
+        pass
