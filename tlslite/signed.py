@@ -30,5 +30,30 @@ class SignedObject(object):
         'sha512'}
 
     def verify_signature(self, publicKey, settings=None):
-        """ Verify signature in a reponse"""
-        pass
+        """Verify signature in a response"""
+        if settings is None:
+            settings = SignatureSettings()
+
+        if not self.tbs_data or not self.signature or not self.signature_alg:
+            return False
+
+        hash_name = self._hash_algs_OIDs.get(tuple(self.signature_alg))
+        if not hash_name:
+            return False
+
+        if hash_name not in settings.rsa_sig_hashes:
+            return False
+
+        key_size = numBytes(publicKey.n)
+        if key_size < settings.min_key_size // 8 or key_size > settings.max_key_size // 8:
+            return False
+
+        for scheme in settings.rsa_schemes:
+            if scheme == 'pss':
+                if publicKey.verify(self.signature, self.tbs_data, hash_name, 'pss'):
+                    return True
+            elif scheme == 'pkcs1':
+                if publicKey.verify(self.signature, self.tbs_data, hash_name):
+                    return True
+
+        return False
