@@ -17,7 +17,17 @@ class HandshakeHelpers(object):
 
         :param ClientHello clientHello: ClientHello to be aligned
         """
-        pass
+        current_length = len(clientHello.write())
+        target_length = ((current_length + 511) // 512) * 512
+        padding_length = target_length - current_length
+
+        padding_extension = next((ext for ext in clientHello.extensions
+                                  if isinstance(ext, PaddingExtension)), None)
+        
+        if padding_extension:
+            padding_extension.paddingData = bytearray(padding_length)
+        else:
+            clientHello.extensions.append(PaddingExtension().create(padding_length))
 
     @staticmethod
     def _calc_binder(prf, psk, handshake_hash, external=True):
@@ -25,12 +35,26 @@ class HandshakeHelpers(object):
         Calculate the binder value for a given HandshakeHash (that includes
         a truncated client hello already)
         """
-        pass
+        if external:
+            label = b"ext binder"
+        else:
+            label = b"res binder"
+
+        early_secret = secureHMAC(bytearray(len(prf.digest())), psk, prf)
+        binder_key = derive_secret(early_secret, label, None, prf)
+        return secureHMAC(binder_key, handshake_hash.digest(prf), prf)
 
     @staticmethod
     def calc_res_binder_psk(iden, res_master_secret, tickets):
         """Calculate PSK associated with provided ticket identity."""
-        pass
+        for ticket in tickets:
+            if ticket.ticket == iden:
+                prf = ticket.prf
+                hash_name = prf.name
+                nonce = ticket.ticket_nonce
+                return HKDF_expand_label(res_master_secret, b"resumption",
+                                         nonce, prf.digest_size, prf)
+        raise TLSIllegalParameterException("Ticket not found")
 
     @staticmethod
     def update_binders(client_hello, handshake_hashes, psk_configs, tickets
@@ -48,7 +72,25 @@ class HandshakeHelpers(object):
         :param bytearray res_master_secret: secret associated with the
             tickets
         """
-        pass
+        psk_ext = next((ext for ext in client_hello.extensions
+                        if isinstance(ext, PreSharedKeyExtension)), None)
+        if not psk_ext:
+            return
+
+        binders = []
+        for i, (identity, psk) in enumerate(psk_configs):
+            if isinstance(psk, bytearray):
+                external = True
+            else:
+                external = False
+                psk = HandshakeHelpers.calc_res_binder_psk(identity, res_master_secret, tickets)
+
+            binder = HandshakeHelpers._calc_binder(psk_ext.prf, psk,
+                                                   handshake_hashes.copy(),
+                                                   external)
+            binders.append(binder)
+
+        psk_ext.binders = binders
 
     @staticmethod
     def verify_binder(client_hello, handshake_hashes, position, secret, prf,
@@ -61,4 +103,18 @@ class HandshakeHelpers(object):
         :param secret: the secret PSK
         :param prf: name of the hash used as PRF
         """
-        pass
+        psk_ext = next((ext for ext in client_hello.extensions
+                        if isinstance(ext, PreSharedKeyExtension)), None)
+        if not psk_ext:
+            raise TLSIllegalParameterException("No PSK extension")
+
+        if position >= len(psk_ext.binders):
+            raise TLSIllegalParameterException("Invalid binder position")
+
+        binder = psk_ext.binders[position]
+        calculated_binder = HandshakeHelpers._calc_binder(prf, secret,
+                                                          handshake_hashes.copy(),
+                                                          external)
+
+        if not ct_compare_digest(binder, calculated_binder):
+            raise TLSIllegalParameterException("Binder does not verify")
