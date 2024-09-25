@@ -40,7 +40,8 @@ class RSAKey(object):
         self.e = e
         self.key_type = key_type
         self._key_hash = None
-        raise NotImplementedError()
+        if self.key_type not in ['rsa', 'rsa-pss']:
+            raise ValueError("Invalid key_type. Must be 'rsa' or 'rsa-pss'.")
 
     def __len__(self):
         """Return the length of this key in bits.
@@ -54,7 +55,7 @@ class RSAKey(object):
 
         :rtype: bool
         """
-        pass
+        return hasattr(self, 'd')
 
     def hashAndSign(self, bytes, rsaScheme='PKCS1', hAlg='sha1', sLen=0):
         """Hash and sign the passed-in bytes.
@@ -127,7 +128,17 @@ class RSAKey(object):
         :rtype: bytearray
         :returns: Mask
         """
-        pass
+        hashObj = hashlib.new(hAlg)
+        hLen = hashObj.digest_size
+        if maskLen > (2**32) * hLen:
+            raise ValueError("mask too long")
+        T = bytearray()
+        for counter in range(ceil(maskLen / hLen)):
+            C = i2osp(counter, 4)
+            hashObj = hashlib.new(hAlg)
+            hashObj.update(mgfSeed + C)
+            T += hashObj.digest()
+        return T[:maskLen]
 
     def EMSA_PSS_encode(self, mHash, emBits, hAlg, sLen=0):
         """Encode the passed in message
@@ -145,7 +156,25 @@ class RSAKey(object):
 
         :type sLen: int
         :param sLen: length of salt"""
-        pass
+        hashObj = hashlib.new(hAlg)
+        hLen = hashObj.digest_size
+        emLen = ceil(emBits / 8)
+        
+        if emLen < hLen + sLen + 2:
+            raise ValueError("encoding error")
+        
+        salt = getRandomBytes(sLen)
+        M_prime = b'\x00' * 8 + mHash + salt
+        
+        H = hashlib.new(hAlg, M_prime).digest()
+        PS = b'\x00' * (emLen - sLen - hLen - 2)
+        DB = PS + b'\x01' + salt
+        dbMask = self.MGF1(H, emLen - hLen - 1, hAlg)
+        maskedDB = bytearray(a ^ b for a, b in zip(DB, dbMask))
+        
+        maskedDB[0] &= 0xFF >> (8 * emLen - emBits)
+        EM = maskedDB + H + b'\xbc'
+        return EM
 
     def RSASSA_PSS_sign(self, mHash, hAlg, sLen=0):
         """"Sign the passed in message
@@ -160,7 +189,14 @@ class RSAKey(object):
 
         :type sLen: int
         :param sLen: length of salt"""
-        pass
+        if not self.hasPrivateKey():
+            raise ValueError("Private key not available")
+        
+        EM = self.EMSA_PSS_encode(mHash, len(self) - 1, hAlg, sLen)
+        m = bytes_to_int(EM)
+        s = self._raw_private_key_op(m)
+        S = int_to_bytes(s, len(self) // 8)
+        return S
 
     def EMSA_PSS_verify(self, mHash, EM, emBits, hAlg, sLen=0):
         """Verify signature in passed in encoded message
@@ -182,7 +218,35 @@ class RSAKey(object):
         :type sLen: int
         :param sLen: Length of salt
         """
-        pass
+        hashObj = hashlib.new(hAlg)
+        hLen = hashObj.digest_size
+        emLen = ceil(emBits / 8)
+        
+        if emLen < hLen + sLen + 2:
+            return False
+        if EM[-1] != 0xbc:
+            return False
+        
+        maskedDB = EM[:emLen - hLen - 1]
+        H = EM[emLen - hLen - 1:-1]
+        
+        if maskedDB[0] & (0xFF << (8 - (emBits & 7))):
+            return False
+        
+        dbMask = self.MGF1(H, emLen - hLen - 1, hAlg)
+        DB = bytearray(a ^ b for a, b in zip(maskedDB, dbMask))
+        DB[0] &= 0xFF >> (8 * emLen - emBits)
+        
+        if any(DB[i] != 0 for i in range(emLen - hLen - sLen - 2)):
+            return False
+        if DB[emLen - hLen - sLen - 2] != 0x01:
+            return False
+        
+        salt = DB[-sLen:] if sLen > 0 else b''
+        M_prime = b'\x00' * 8 + mHash + salt
+        H_prime = hashlib.new(hAlg, M_prime).digest()
+        
+        return ct_eq_u32(H, H_prime)
 
     def RSASSA_PSS_verify(self, mHash, S, hAlg, sLen=0):
         """Verify the signature in passed in message
@@ -201,11 +265,24 @@ class RSAKey(object):
         :type sLen: int
         :param sLen: Length of salt
         """
-        pass
+        if len(S) != len(self) // 8:
+            return False
+        
+        s = bytes_to_int(S)
+        m = self._raw_public_key_op(s)
+        EM = int_to_bytes(m, len(self) // 8)
+        
+        return self.EMSA_PSS_verify(mHash, EM, len(self) - 1, hAlg, sLen)
 
     def _raw_pkcs1_sign(self, bytes):
         """Perform signature on raw data, add PKCS#1 padding."""
-        pass
+        if not self.hasPrivateKey():
+            raise ValueError("Private key not available")
+        
+        paddedBytes = self._addPKCS1Padding(bytes, 1)
+        m = bytes_to_int(paddedBytes)
+        s = self._raw_private_key_op(m)
+        return int_to_bytes(s, len(self) // 8)
 
     def sign(self, bytes, padding='pkcs1', hashAlg=None, saltLen=None):
         """Sign the passed-in bytes.
@@ -232,11 +309,28 @@ class RSAKey(object):
         :rtype: bytearray
         :returns: A PKCS1 signature on the passed-in data.
         """
-        pass
+        if not self.hasPrivateKey():
+            raise ValueError("Private key not available")
+
+        if padding == 'pkcs1':
+            hashBytes = hashlib.new(hashAlg, bytes).digest() if hashAlg else bytes
+            prefixedHashBytes = self.addPKCS1Prefix(hashBytes, hashAlg) if hashAlg else hashBytes
+            return self._raw_pkcs1_sign(prefixedHashBytes)
+        elif padding == 'pss':
+            if not hashAlg:
+                raise ValueError("hashAlg is mandatory for PSS padding")
+            hashBytes = hashlib.new(hashAlg, bytes).digest()
+            saltLen = saltLen or len(hashBytes)
+            return self.RSASSA_PSS_sign(hashBytes, hashAlg, saltLen)
+        else:
+            raise ValueError("Unsupported padding mode")
 
     def _raw_pkcs1_verify(self, sigBytes, bytes):
         """Perform verification operation on raw PKCS#1 padded signature"""
-        pass
+        s = bytes_to_int(sigBytes)
+        m = self._raw_public_key_op(s)
+        em = int_to_bytes(m, len(self) // 8)
+        return self._removePKCS1Padding(em) == bytes
 
     def verify(self, sigBytes, bytes, padding='pkcs1', hashAlg=None,
         saltLen=None):
@@ -253,7 +347,18 @@ class RSAKey(object):
         :rtype: bool
         :returns: Whether the signature matches the passed-in data.
         """
-        pass
+        if padding == 'pkcs1':
+            hashBytes = hashlib.new(hashAlg, bytes).digest() if hashAlg else bytes
+            prefixedHashBytes = self.addPKCS1Prefix(hashBytes, hashAlg) if hashAlg else hashBytes
+            return self._raw_pkcs1_verify(sigBytes, prefixedHashBytes)
+        elif padding == 'pss':
+            if not hashAlg:
+                raise ValueError("hashAlg is mandatory for PSS padding")
+            hashBytes = hashlib.new(hashAlg, bytes).digest()
+            saltLen = saltLen or len(hashBytes)
+            return self.RSASSA_PSS_verify(hashBytes, sigBytes, hashAlg, saltLen)
+        else:
+            raise ValueError("Unsupported padding mode")
 
     def encrypt(self, bytes):
         """Encrypt the passed-in bytes.
