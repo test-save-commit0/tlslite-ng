@@ -77,7 +77,18 @@ class TLSConnection(TLSRecordLayer):
         :type length: int
         :param length: number of bytes of the keying material to export
         """
-        pass
+        if self.version < (3, 1):
+            raise ValueError("Keying material export not supported in SSL 3.0")
+        
+        if self.session is None:
+            raise ValueError("Handshake not completed")
+        
+        if not self.session.masterSecret:
+            raise ValueError("Master secret not available")
+        
+        seed = bytearray(b'client finished') + bytearray(b'server finished')
+        return HKDF_expand_label(self.session.masterSecret, label, seed, length,
+                                 self.session.cipherSuite.hashName)
 
     @deprecated_params({'async_': 'async'},
         "'{old_name}' is a keyword in Python 3.7, use'{new_name}'")
@@ -296,18 +307,29 @@ class TLSConnection(TLSRecordLayer):
     @staticmethod
     def _getKEX(group, version):
         """Get object for performing key exchange."""
-        pass
+        if group in CURVE_ALIASES:
+            return ECDHKeyExchange(group, version)
+        elif group in FFDHE_GROUPS:
+            return FFDHKeyExchange(group, version)
+        else:
+            raise ValueError("Unsupported group for key exchange")
 
     @classmethod
     def _genKeyShareEntry(cls, group, version):
         """Generate KeyShareEntry object from randomly selected private value.
         """
-        pass
+        kex = cls._getKEX(group, version)
+        private = kex.get_random_private_key()
+        public = kex.calc_public_value(private)
+        return KeyShareEntry().create(group, public)
 
     @staticmethod
     def _getPRFParams(cipher_suite):
         """Return name of hash used for PRF and the hash output size."""
-        pass
+        if cipher_suite in CipherSuite.sha384PrfSuites:
+            return "sha384", 48
+        else:
+            return "sha256", 32
 
     def _clientTLS13Handshake(self, settings, session, clientHello,
         clientCertChain, privateKey, serverHello):
@@ -327,7 +349,23 @@ class TLSConnection(TLSRecordLayer):
         Checks if the certificate key size matches the minimum and maximum
         sizes set or that it uses curves enabled in settings
         """
-        pass
+        if not cert_chain:
+            return
+
+        leaf_cert = cert_chain.getLeaf()
+        if leaf_cert.certAlg == "rsa":
+            key_size = leaf_cert.publicKey.size_in_bits()
+            if key_size < settings.minKeySize:
+                raise TLSLocalAlert(AlertDescription.handshake_failure,
+                                    "Server key too small: {0}".format(key_size))
+            if key_size > settings.maxKeySize:
+                raise TLSLocalAlert(AlertDescription.handshake_failure,
+                                    "Server key too large: {0}".format(key_size))
+        elif leaf_cert.certAlg == "ecdsa":
+            curve_name = leaf_cert.publicKey.curve_name
+            if curve_name not in settings.eccCurves:
+                raise TLSLocalAlert(AlertDescription.handshake_failure,
+                                    "Curve not supported: {0}".format(curve_name))
 
     def handshakeServer(self, verifierDB=None, certChain=None, privateKey=
         None, reqCert=False, sessionCache=None, settings=None, checker=None,
