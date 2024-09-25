@@ -21,7 +21,12 @@ def generateRSAKey(bits, implementations=['openssl', 'python']):
     :rtype: ~tlslite.utils.rsakey.RSAKey
     :returns: A new RSA private key.
     """
-    pass
+    for implementation in implementations:
+        if implementation == 'openssl' and cryptomath.m2cryptoLoaded:
+            return OpenSSL_RSAKey.generate(bits)
+        elif implementation == 'python':
+            return Python_RSAKey.generate(bits)
+    raise ValueError("No supported implementation available")
 
 
 def parsePEMKey(s, private=False, public=False, passwordCallback=None,
@@ -81,7 +86,18 @@ def parsePEMKey(s, private=False, public=False, passwordCallback=None,
 
     :raises SyntaxError: If the key is not properly formatted.
     """
-    pass
+    for implementation in implementations:
+        if implementation == 'openssl' and cryptomath.m2cryptoLoaded:
+            try:
+                return OpenSSL_RSAKey.parse(s, private, public, passwordCallback)
+            except:
+                pass
+        elif implementation == 'python':
+            try:
+                return Python_RSAKey.parse(s, private, public)
+            except:
+                pass
+    raise SyntaxError("Unable to parse the PEM key")
 
 
 def parseAsPublicKey(s):
@@ -95,7 +111,7 @@ def parseAsPublicKey(s):
 
     :raises SyntaxError: If the key is not properly formatted.
     """
-    pass
+    return parsePEMKey(s, private=False, public=True)
 
 
 def parsePrivateKey(s):
@@ -109,7 +125,7 @@ def parsePrivateKey(s):
 
     :raises SyntaxError: If the key is not properly formatted.
     """
-    pass
+    return parsePEMKey(s, private=True)
 
 
 def _createPublicKey(key):
@@ -117,14 +133,35 @@ def _createPublicKey(key):
     Create a new public key.  Discard any private component,
     and return the most efficient key possible.
     """
-    pass
+    if isinstance(key, RSAKey):
+        return _createPublicRSAKey(key)
+    elif isinstance(key, Python_ECDSAKey):
+        return _create_public_ecdsa_key(key.public_key().point.x(), key.public_key().point.y(), key.curve.name)
+    elif isinstance(key, Python_DSAKey):
+        return _create_public_dsa_key(key.p, key.q, key.g, key.y)
+    elif isinstance(key, Python_EdDSAKey):
+        return _create_public_eddsa_key(key.public_key())
+    else:
+        raise ValueError("Unsupported key type")
 
 
 def _createPrivateKey(key):
     """
     Create a new private key.  Return the most efficient key possible.
     """
-    pass
+    if isinstance(key, RSAKey):
+        if cryptomath.m2cryptoLoaded:
+            return OpenSSL_RSAKey(key.n, key.e, key.d, key.p, key.q, key.dP, key.dQ, key.qInv)
+        else:
+            return Python_RSAKey(key.n, key.e, key.d, key.p, key.q, key.dP, key.dQ, key.qInv)
+    elif isinstance(key, Python_ECDSAKey):
+        return key
+    elif isinstance(key, Python_DSAKey):
+        return key
+    elif isinstance(key, Python_EdDSAKey):
+        return key
+    else:
+        raise ValueError("Unsupported key type")
 
 
 def _create_public_ecdsa_key(point_x, point_y, curve_name, implementations=
@@ -148,7 +185,20 @@ def _create_public_ecdsa_key(point_x, point_y, curve_name, implementations=
         concrete implementation of the verifying key (only 'python' is
         supported currently)
     """
-    pass
+    if 'python' in implementations:
+        from ecdsa import NIST256p, SECP256k1, VerifyingKey, Point
+        if curve_name == 'NIST256p':
+            curve = NIST256p
+        elif curve_name == 'SECP256k1':
+            curve = SECP256k1
+        else:
+            raise ValueError("Unsupported curve name")
+        
+        point = Point(curve.curve, point_x, point_y)
+        vk = VerifyingKey.from_public_point(point, curve)
+        return Python_ECDSAKey(vk)
+    else:
+        raise ValueError("No supported implementation available")
 
 
 def _create_public_eddsa_key(public_key, implementations=('python',)):
@@ -156,7 +206,10 @@ def _create_public_eddsa_key(public_key, implementations=('python',)):
     Convert the python-ecdsa public key into concrete implementation of
     verifier.
     """
-    pass
+    if 'python' in implementations:
+        return Python_EdDSAKey(public_key)
+    else:
+        raise ValueError("No supported implementation available")
 
 
 def _create_public_dsa_key(p, q, g, y, implementations=('python',)):
@@ -178,4 +231,7 @@ def _create_public_dsa_key(p, q, g, y, implementations=('python',)):
         concrete implementation of the verifying key (only 'python' is
         supported currently)
     """
-    pass
+    if 'python' in implementations:
+        return Python_DSAKey(p, q, g, y)
+    else:
+        raise ValueError("No supported implementation available")
