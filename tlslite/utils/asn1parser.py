@@ -59,7 +59,14 @@ class ASN1Parser(object):
         :rtype: ASN1Parser
         :returns: decoded child object
         """
-        pass
+        if self.type.is_primitive:
+            raise ValueError("Cannot get child of a primitive type")
+        
+        children = self._parse_children()
+        if which >= len(children):
+            raise IndexError("Child index out of range")
+        
+        return ASN1Parser(children[which])
 
     def getChildCount(self):
         """
@@ -68,7 +75,9 @@ class ASN1Parser(object):
         :rtype: int
         :returns: number of children in the object
         """
-        pass
+        if self.type.is_primitive:
+            return 0
+        return len(self._parse_children())
 
     def getChildBytes(self, which):
         """
@@ -80,14 +89,51 @@ class ASN1Parser(object):
         :rtype: bytearray
         :returns: raw child object
         """
-        pass
+        if self.type.is_primitive:
+            raise ValueError("Cannot get child of a primitive type")
+        
+        children = self._parse_children()
+        if which >= len(children):
+            raise IndexError("Child index out of range")
+        
+        return children[which]
 
     @staticmethod
     def _getASN1Length(p):
         """Decode the ASN.1 DER length field"""
-        pass
+        first_byte = p.get(1)[0]
+        if first_byte & 0x80 == 0:
+            return first_byte
+        else:
+            length_bytes = first_byte & 0x7F
+            return int.from_bytes(p.get(length_bytes), byteorder='big')
 
     @staticmethod
     def _parse_type(parser):
         """Decode the ASN.1 DER type field"""
-        pass
+        type_byte = parser.get(1)[0]
+        tag_class = (type_byte & 0xC0) >> 6
+        is_primitive = (type_byte & 0x20) == 0
+        tag_id = type_byte & 0x1F
+        
+        if tag_id == 0x1F:
+            # Long form
+            tag_id = 0
+            while True:
+                next_byte = parser.get(1)[0]
+                tag_id = (tag_id << 7) | (next_byte & 0x7F)
+                if next_byte & 0x80 == 0:
+                    break
+        
+        return ASN1Type(tag_class, is_primitive, tag_id)
+
+    def _parse_children(self):
+        """Parse children of a constructed type"""
+        children = []
+        p = Parser(self.value)
+        while p.hasMoreBytes():
+            child_type = self._parse_type(p)
+            child_length = self._getASN1Length(p)
+            child_value = p.getFixBytes(child_length)
+            children.append(child_type.bytes + child_length.to_bytes((child_length.bit_length() + 7) // 8, byteorder='big') + child_value)
+        return children
