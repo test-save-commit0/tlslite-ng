@@ -570,36 +570,57 @@ def paramStrength(param):
     :param param: prime or modulus
     :type param: int
     """
-    pass
+    bit_size = param.bit_length()
+    if bit_size < 1024:
+        return 80
+    elif bit_size < 2048:
+        return 112
+    elif bit_size < 3072:
+        return 128
+    elif bit_size < 7680:
+        return 192
+    else:
+        return 256
 
 
 def P_hash(mac_name, secret, seed, length):
     """Internal method for calculation the PRF in TLS."""
-    pass
+    bytes_to_return = bytearray()
+    hmac_hash = hmac.HMAC(secret, digestmod=getattr(hashlib, mac_name))
+    a = seed
+    while len(bytes_to_return) < length:
+        hmac_hash.update(a)
+        a = hmac_hash.digest()
+        hmac_hash.update(a + seed)
+        bytes_to_return += hmac_hash.digest()
+    return bytes_to_return[:length]
 
 
 def PRF_1_2(secret, label, seed, length):
     """Pseudo Random Function for TLS1.2 ciphers that use SHA256"""
-    pass
+    return P_hash('sha256', secret, label + seed, length)
 
 
 def PRF_1_2_SHA384(secret, label, seed, length):
     """Pseudo Random Function for TLS1.2 ciphers that use SHA384"""
-    pass
+    return P_hash('sha384', secret, label + seed, length)
 
 
 @deprecated_method('Please use calc_key function instead.')
 def calcExtendedMasterSecret(version, cipherSuite, premasterSecret,
     handshakeHashes):
     """Derive Extended Master Secret from premaster and handshake msgs"""
-    pass
+    return calc_key(version, premasterSecret, cipherSuite, b'extended master secret',
+                    handshake_hashes=handshakeHashes, output_length=48)
 
 
 @deprecated_method('Please use calc_key function instead.')
 def calcMasterSecret(version, cipherSuite, premasterSecret, clientRandom,
     serverRandom):
     """Derive Master Secret from premaster secret and random values"""
-    pass
+    return calc_key(version, premasterSecret, cipherSuite, b'master secret',
+                    client_random=clientRandom, server_random=serverRandom,
+                    output_length=48)
 
 
 @deprecated_method('Please use calc_key function instead.')
@@ -614,7 +635,10 @@ def calcFinished(version, masterSecret, cipherSuite, handshakeHashes, isClient
     :param isClient: whether the calculation should be performed for message
         sent by client (True) or by server (False) side of connection
     """
-    pass
+    label = b'client finished' if isClient else b'server finished'
+    return calc_key(version, masterSecret, cipherSuite, label,
+                    handshake_hashes=handshakeHashes,
+                    output_length=12)
 
 
 def calc_key(version, secret, cipher_suite, label, handshake_hashes=None,
@@ -640,8 +664,60 @@ def calc_key(version, secret, cipher_suite, label, handshake_hashes=None,
         master secret or key expansion.
     :param int output_length: Number of bytes to output.
     """
-    pass
+    if version >= (3, 3):  # TLS 1.2+
+        if cipher_suite in CipherSuite.sha384PrfSuites:
+            prf = PRF_1_2_SHA384
+        else:
+            prf = PRF_1_2
+    else:  # TLS 1.1 and earlier
+        prf = lambda secret, label, seed, length: P_hash('md5', secret, label + seed, length//2) + \
+                                                  P_hash('sha1', secret, label + seed, length - length//2)
+
+    if label in (b'extended master secret', b'client finished', b'server finished'):
+        seed = handshake_hashes.digest(version)
+    elif label == b'master secret':
+        seed = client_random + server_random
+    elif label == b'key expansion':
+        seed = server_random + client_random
+    else:
+        raise ValueError("Unknown label: " + str(label))
+
+    if output_length is None:
+        if label == b'master secret':
+            output_length = 48
+        elif label == b'key expansion':
+            output_length = 2 * (20 + 20 + 16)  # 2 * (MAC + IV + key)
+        else:
+            output_length = 12  # finished message length
+
+    return prf(secret, label, seed, output_length)
 
 
 class MAC_SSL(object):
-    pass
+    def __init__(self, key, digest_size):
+        self.key = key
+        self.digest_size = digest_size
+        self.digest_alg = hashlib.md5 if digest_size == 16 else hashlib.sha1
+        self.inner = self.digest_alg()
+        self.outer = self.digest_alg()
+
+        key_pad = key + b'\x00' * (64 - len(key))
+        self.inner.update(bytes(x ^ 0x36 for x in key_pad))
+        self.outer.update(bytes(x ^ 0x5C for x in key_pad))
+
+    def update(self, data):
+        self.inner.update(data)
+
+    def copy(self):
+        new = MAC_SSL.__new__(MAC_SSL)
+        new.key = self.key
+        new.digest_size = self.digest_size
+        new.digest_alg = self.digest_alg
+        new.inner = self.inner.copy()
+        new.outer = self.outer.copy()
+        return new
+
+    def digest(self):
+        h = self.outer.copy()
+        h.update(self.inner.digest())
+        return h.digest()[:self.digest_size]
