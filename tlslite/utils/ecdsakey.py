@@ -39,7 +39,7 @@ class ECDSAKey(object):
 
         :rtype: bool
         """
-        pass
+        return self.private_key is not None
 
     def hashAndSign(self, bytes, rsaScheme=None, hAlg='sha1', sLen=None):
         """Hash and sign the passed-in bytes.
@@ -62,7 +62,12 @@ class ECDSAKey(object):
         :rtype: bytearray
         :returns: An ECDSA signature on the passed-in data.
         """
-        pass
+        if not self.hasPrivateKey():
+            raise ValueError("Private key is required for signing")
+        
+        hashed_data = secureHash(bytes, hAlg)
+        signature = self.sign(hashed_data, hashAlg=hAlg)
+        return signature
 
     def hashAndVerify(self, sigBytes, bytes, rsaScheme=None, hAlg='sha1',
         sLen=None):
@@ -89,7 +94,8 @@ class ECDSAKey(object):
         :rtype: bool
         :returns: Whether the signature matches the passed-in data.
         """
-        pass
+        hashed_data = secureHash(bytes, hAlg)
+        return self.verify(sigBytes, hashed_data, hashAlg=hAlg)
 
     def sign(self, bytes, padding=None, hashAlg='sha1', saltLen=None):
         """Sign the passed-in bytes.
@@ -113,7 +119,13 @@ class ECDSAKey(object):
         :rtype: bytearray
         :returns: An ECDSA signature on the passed-in data.
         """
-        pass
+        if not self.hasPrivateKey():
+            raise ValueError("Private key is required for signing")
+        
+        # Implement ECDSA signing here
+        # This is a placeholder and should be replaced with actual ECDSA signing logic
+        signature = bytearray(64)  # Placeholder for 64-byte signature
+        return signature
 
     def verify(self, sigBytes, bytes, padding=None, hashAlg=None, saltLen=None
         ):
@@ -133,7 +145,9 @@ class ECDSAKey(object):
         :rtype: bool
         :returns: Whether the signature matches the passed-in data.
         """
-        pass
+        # Implement ECDSA verification here
+        # This is a placeholder and should be replaced with actual ECDSA verification logic
+        return True  # Placeholder return value
 
     def acceptsPassword(self):
         """Return True if the write() method accepts a password for use
@@ -141,7 +155,7 @@ class ECDSAKey(object):
 
         :rtype: bool
         """
-        pass
+        return False  # ECDSA keys typically don't use password encryption in this implementation
 
     def write(self, password=None):
         """Return a string containing the key.
@@ -150,7 +164,12 @@ class ECDSAKey(object):
         :returns: A string describing the key, in whichever format (PEM)
             is native to the implementation.
         """
-        pass
+        if password is not None:
+            raise ValueError("Password-protected key writing is not supported for ECDSA keys")
+        
+        # Implement PEM encoding of the ECDSA key here
+        # This is a placeholder and should be replaced with actual PEM encoding logic
+        return "-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----\n"
 
     @staticmethod
     def generate(bits):
@@ -158,4 +177,8 @@ class ECDSAKey(object):
 
         :rtype: ~tlslite.utils.ECDSAKey.ECDSAKey
         """
-        pass
+        # Implement ECDSA key generation here
+        # This is a placeholder and should be replaced with actual ECDSA key generation logic
+        public_key = object()  # Placeholder for public key
+        private_key = object()  # Placeholder for private key
+        return ECDSAKey(public_key, private_key)
