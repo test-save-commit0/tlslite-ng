@@ -25,7 +25,11 @@ class BaseDB(object):
 
         :raises anydbm.error: If there's a problem creating the database.
         """
-        pass
+        if self.filename:
+            self.db = anydbm.open(self.filename, 'c')
+            self.db['--Reserved--'] = self.type
+        else:
+            raise ValueError("Filename not specified")
 
     def open(self):
         """
@@ -34,7 +38,12 @@ class BaseDB(object):
         :raises anydbm.error: If there's a problem opening the database.
         :raises ValueError: If the database is not of the right type.
         """
-        pass
+        if self.filename:
+            self.db = anydbm.open(self.filename, 'w')
+            if '--Reserved--' not in self.db or self.db['--Reserved--'] != self.type:
+                raise ValueError("Database is not of type %s" % self.type)
+        else:
+            raise ValueError("Filename not specified")
 
     def __getitem__(self, username):
         if self.db == None:
@@ -94,4 +103,13 @@ class BaseDB(object):
         :rtype: list
         :returns: The usernames in the database.
         """
-        pass
+        if self.db is None:
+            raise AssertionError('DB not open')
+        self.lock.acquire()
+        try:
+            keys = list(self.db.keys())
+            if '--Reserved--' in keys:
+                keys.remove('--Reserved--')
+            return keys
+        finally:
+            self.lock.release()
