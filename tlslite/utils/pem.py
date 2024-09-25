@@ -17,7 +17,14 @@ def dePem(s, name):
     The first such PEM block in the input will be found, and its
     payload will be base64 decoded and returned.
     """
-    pass
+    start = s.find(f"-----BEGIN {name}-----")
+    end = s.find(f"-----END {name}-----")
+    if start == -1 or end == -1:
+        raise ValueError(f"PEM block for {name} not found")
+    
+    start += len(f"-----BEGIN {name}-----")
+    pem_data = s[start:end].strip()
+    return bytearray(binascii.a2b_base64(pem_data))
 
 
 def dePemList(s, name):
@@ -44,7 +51,19 @@ def dePemList(s, name):
     All such PEM blocks will be found, decoded, and return in an ordered list
     of bytearrays, which may have zero elements if not PEM blocks are found.
     """
-    pass
+    result = []
+    start = 0
+    while True:
+        start = s.find(f"-----BEGIN {name}-----", start)
+        if start == -1:
+            break
+        end = s.find(f"-----END {name}-----", start)
+        if end == -1:
+            break
+        pem_block = s[start:end + len(f"-----END {name}-----")]
+        result.append(dePem(pem_block, name))
+        start = end + len(f"-----END {name}-----")
+    return result
 
 
 def pem(b, name):
@@ -59,4 +78,6 @@ def pem(b, name):
         KoZIhvcNAQEFBQADAwA5kw==
         -----END CERTIFICATE-----
     """
-    pass
+    b64 = binascii.b2a_base64(b).decode('ascii').strip()
+    lines = [b64[i:i+64] for i in range(0, len(b64), 64)]
+    return f"-----BEGIN {name}-----\n" + "\n".join(lines) + f"\n-----END {name}-----\n"
