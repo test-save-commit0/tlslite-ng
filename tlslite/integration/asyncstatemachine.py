@@ -37,7 +37,15 @@ class AsyncStateMachine:
         :rtype: bool or None
         :returns: If the state machine wants to read.
         """
-        pass
+        if self.handshaker:
+            return self.handshaker.wantsReadEvent()
+        elif self.closer:
+            return self.closer.wantsReadEvent()
+        elif self.reader:
+            return True
+        elif self.writer:
+            return False
+        return None
 
     def wantsWriteEvent(self):
         """If the state machine wants to write.
@@ -49,7 +57,15 @@ class AsyncStateMachine:
         :rtype: bool or None
         :returns: If the state machine wants to write.
         """
-        pass
+        if self.handshaker:
+            return self.handshaker.wantsWriteEvent()
+        elif self.closer:
+            return self.closer.wantsWriteEvent()
+        elif self.writer:
+            return True
+        elif self.reader:
+            return False
+        return None
 
     def outConnectEvent(self):
         """Called when a handshake operation completes.
@@ -79,11 +95,43 @@ class AsyncStateMachine:
 
     def inReadEvent(self):
         """Tell the state machine it can read from the socket."""
-        pass
+        try:
+            if self.handshaker:
+                self.result = next(self.handshaker)
+                if self.result is None:
+                    self.handshaker = None
+                    self.outConnectEvent()
+            elif self.closer:
+                self.result = next(self.closer)
+                if self.result is None:
+                    self.closer = None
+                    self.outCloseEvent()
+            elif self.reader:
+                readBuffer = self.reader.read()
+                self.reader = None
+                self.outReadEvent(readBuffer)
+        except StopIteration:
+            self._clear()
 
     def inWriteEvent(self):
         """Tell the state machine it can write to the socket."""
-        pass
+        try:
+            if self.handshaker:
+                self.result = next(self.handshaker)
+                if self.result is None:
+                    self.handshaker = None
+                    self.outConnectEvent()
+            elif self.closer:
+                self.result = next(self.closer)
+                if self.result is None:
+                    self.closer = None
+                    self.outCloseEvent()
+            elif self.writer:
+                self.writer.write()
+                self.writer = None
+                self.outWriteEvent()
+        except StopIteration:
+            self._clear()
 
     def setHandshakeOp(self, handshaker):
         """Start a handshake operation.
@@ -93,7 +141,8 @@ class AsyncStateMachine:
             :py:meth:`~.TLSConnection.handshakeServerAsync` , or
             handshakeClientxxx(..., async_=True).
         """
-        pass
+        self._clear()
+        self.handshaker = handshaker
 
     def setServerHandshakeOp(self, **args):
         """Start a handshake operation.
@@ -101,16 +150,19 @@ class AsyncStateMachine:
         The arguments passed to this function will be forwarded to
         :py:obj:`~tlslite.tlsconnection.TLSConnection.handshakeServerAsync`.
         """
-        pass
+        self._clear()
+        self.handshaker = self.tlsConnection.handshakeServerAsync(**args)
 
     def setCloseOp(self):
         """Start a close operation.
         """
-        pass
+        self._clear()
+        self.closer = self.tlsConnection.closeAsync()
 
     def setWriteOp(self, writeBuffer):
         """Start a write operation.
 
         :param str writeBuffer: The string to transmit.
         """
-        pass
+        self._clear()
+        self.writer = self.tlsConnection.writeAsync(writeBuffer)
