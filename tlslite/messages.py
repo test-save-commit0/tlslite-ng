@@ -32,15 +32,24 @@ class RecordHeader3(RecordHeader):
 
     def create(self, version, type, length):
         """Set object values for writing (serialisation)."""
-        pass
+        self.version = version
+        self.type = type
+        self.length = length
 
     def write(self):
         """Serialise object to bytearray."""
-        pass
+        writer = Writer()
+        writer.add(self.type, 1)
+        writer.add(self.version[0], 1)
+        writer.add(self.version[1], 1)
+        writer.add(self.length, 2)
+        return writer.bytes
 
     def parse(self, parser):
         """Deserialise object from Parser."""
-        pass
+        self.type = parser.get(1)
+        self.version = (parser.get(1), parser.get(1))
+        self.length = parser.get(2)
 
     def __str__(self):
         return (
@@ -71,15 +80,23 @@ class RecordHeader2(RecordHeader):
 
     def parse(self, parser):
         """Deserialise object from Parser."""
-        pass
+        first_byte = parser.get(1)
+        self.length = ((first_byte & 0x7f) << 8) | parser.get(1)
+        self.padding = parser.get(1)
+        self.securityEscape = bool(first_byte & 0x80)
 
     def create(self, length, padding=0, securityEscape=False):
         """Set object's values."""
-        pass
+        self.length = length
+        self.padding = padding
+        self.securityEscape = securityEscape
 
     def write(self):
         """Serialise object to bytearray."""
-        pass
+        first_byte = (self.length >> 8) & 0x7f
+        if self.securityEscape:
+            first_byte |= 0x80
+        return bytearray([first_byte, self.length & 0xff, self.padding])
 
 
 class Message(object):
@@ -99,7 +116,7 @@ class Message(object):
 
     def write(self):
         """Return serialised object data."""
-        pass
+        return self.data
 
 
 class Alert(object):
@@ -155,7 +172,12 @@ class HelloMessage(HandshakeMsg):
         :raises TLSInternalError: when there are multiple extensions of the
             same type
         """
-        pass
+        if self.extensions is None:
+            return None
+        matching = [ext for ext in self.extensions if ext.extType == extType]
+        if len(matching) > 1:
+            raise TLSInternalError("Multiple extensions of the same type present")
+        return matching[0] if matching else None
 
     def addExtension(self, ext):
         """
@@ -164,15 +186,19 @@ class HelloMessage(HandshakeMsg):
         :type ext: TLSExtension
         :param ext: extension object to add to list
         """
-        pass
+        if self.extensions is None:
+            self.extensions = []
+        self.extensions.append(ext)
 
     def _addExt(self, extType):
         """Add en empty extension of given type, if not already present"""
-        pass
+        if not self.getExtension(extType):
+            self.addExtension(TLSExtension().create(extType, bytearray(0)))
 
     def _removeExt(self, extType):
         """Remove extension of given type"""
-        pass
+        if self.extensions:
+            self.extensions = [ext for ext in self.extensions if ext.extType != extType]
 
     def _addOrRemoveExt(self, extType, add):
         """
@@ -183,7 +209,10 @@ class HelloMessage(HandshakeMsg):
         :type add: boolean
         :param add: whether to add (True) or remove (False) the extension
         """
-        pass
+        if add:
+            self._addExt(extType)
+        else:
+            self._removeExt(extType)
 
 
 class ClientHello(HelloMessage):
