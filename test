@@ -1,0 +1,70 @@
+from tlslite.x509certchain import X509CertChain
+from tlslite.x509 import X509
+from tlslite.utils.pem import parsePemList
+
+class TestX509CertChain(unittest.TestCase):
+    def setUp(self):
+        # Sample PEM-encoded certificate
+        self.pem_cert = """-----BEGIN CERTIFICATE-----
+MIIDazCCAlOgAwIBAgIUJQpNHaJuEpNIFiLthZ+6T+JuMb0wDQYJKoZIhvcNAQEL
+BQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yMzA1MTcxNTIyMzhaFw0yNDA1
+MTYxNTIyMzhaMEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEw
+HwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQC8VHvNs5tsD+qLILrjWb5C4GFaWd5eUr6XQgKTuBJM
+F7uqIIJuZOXAJkN7y5+gHj5o7aPP/DLDHoLGM2uX4h01XKVdlLmjXlf+WzUUKLR8
+LfPICNIH7FB5vAn8tawuHjRBNs1nZMgGE7STv756o1FBqZYZu0gF3dGlBg5yFPwO
+1I4IG1j+GnDN4OYw5BjtN6nGvEQiR7pvVGhXHOJTOVHbvZf3sFHPeFvzilKBe0pq
+5bhVzDNAvwXX+jNvGWHKW3YdVcqnJFX9JR8UzWWbYrs0xnuY5NeKzXCcCsXISLrx
+mJRUVDQn4z0Xp2LH1H8vWf+0LNQ4NZY5Tovg+/+AxOYnAgMBAAGjUzBRMB0GA1Ud
+DgQWBBQHWYtkZGWulLut7eo/ufZzONAvYjAfBgNVHSMEGDAWgBQHWYtkZGWulLut
+7eo/ufZzONAvYjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCL
+FWFd5ZzTxbuTxDl2X8qFJEr++eTtLKdwZyq6dfne6v6DGIXIPoKWE9DTrEZijQZP
+/UxttRKM8j3GcKQbOdXf5ZgMT2qh+1zau6CUBw5a9h2xkHC9PsPhRXRIVFdNWA/w
+eQM8aqnuUmRlGqyOQAXhLhLzVOUl+cqDaJjPQ0FqoFiEPD+P5WpWlTxLgLYsKJ9P
+bFXDj9FQcuHwWRaTzpTXdxDcg6wCJI3uJq6FnAfGLAp5DZydtGbAy+q1pMEmwZrw
+RX+1PTAOF2tc0TK7Gx1WqTbMQ3ZSie6oBNQ8UkHMqLznEt8mZnUMBOXjAqrwq8IJ
+1/Jg9RBljKJXXRYQbWPk
+-----END CERTIFICATE-----"""
+
+    def test_parsePemList(self):
+        chain = X509CertChain()
+        chain.parsePemList(self.pem_cert)
+        self.assertEqual(chain.getNumCerts(), 1)
+
+    def test_getNumCerts(self):
+        chain = X509CertChain()
+        self.assertEqual(chain.getNumCerts(), 0)
+        
+        chain.parsePemList(self.pem_cert)
+        self.assertEqual(chain.getNumCerts(), 1)
+
+    def test_getEndEntityPublicKey(self):
+        chain = X509CertChain()
+        chain.parsePemList(self.pem_cert)
+        public_key = chain.getEndEntityPublicKey()
+        self.assertIsNotNone(public_key)
+
+    def test_getFingerprint(self):
+        chain = X509CertChain()
+        chain.parsePemList(self.pem_cert)
+        fingerprint = chain.getFingerprint()
+        self.assertIsInstance(fingerprint, str)
+        self.assertEqual(len(fingerprint), 64)  # SHA256 fingerprint is 64 characters long
+
+    def test_getTackExt(self):
+        chain = X509CertChain()
+        chain.parsePemList(self.pem_cert)
+        tack_ext = chain.getTackExt()
+        self.assertIsNone(tack_ext)  # Assuming the sample cert doesn't have a TACK extension
+
+    def test_empty_chain(self):
+        chain = X509CertChain()
+        with self.assertRaises(ValueError):
+            chain.getEndEntityPublicKey()
+        with self.assertRaises(ValueError):
+            chain.getFingerprint()
+        self.assertIsNone(chain.getTackExt())
+
+if __name__ == '__main__':
+    unittest.main()
