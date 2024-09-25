@@ -11,7 +11,11 @@ def parseBinary(data):
     :param bytes data: DH parameters
     :rtype: tuple of int
     """
-    pass
+    parser = ASN1Parser(data)
+    sequence = parser.getChild()
+    p = bytesToNumber(sequence.getChildBytes(0))
+    g = bytesToNumber(sequence.getChildBytes(1))
+    return (p, g)
 
 
 def parse(data):
@@ -24,4 +28,9 @@ def parse(data):
     :rtype: tuple of int
     :returns: generator and prime
     """
-    pass
+    try:
+        der = dePem(data, "DH PARAMETERS")
+    except ValueError:
+        der = data
+
+    return parseBinary(der)
