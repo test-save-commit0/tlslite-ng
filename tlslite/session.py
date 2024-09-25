@@ -95,7 +95,7 @@ class Session(object):
         :rtype: bool
         :returns: If this session can be used for session resumption.
         """
-        pass
+        return bool(self.masterSecret and self.cipherSuite and self.resumable)
 
     def getCipherName(self):
         """Get the name of the cipher used with this connection.
@@ -103,7 +103,7 @@ class Session(object):
         :rtype: str
         :returns: The name of the cipher used with this connection.
         """
-        pass
+        return CipherSuite.getName(self.cipherSuite)
 
     def getMacName(self):
         """Get the name of the HMAC hash algo used with this connection.
@@ -111,7 +111,7 @@ class Session(object):
         :rtype: str
         :returns: The name of the HMAC hash algo used with this connection.
         """
-        pass
+        return CipherSuite.getMacName(self.cipherSuite)
 
 
 class Ticket(object):
