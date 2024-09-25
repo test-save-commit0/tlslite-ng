@@ -40,6 +40,28 @@ class SingleResponse(object):
         'sha256', tuple([96, 134, 72, 1, 101, 3, 4, 2, 2]): 'sha384', tuple
         ([96, 134, 72, 1, 101, 3, 4, 2, 3]): 'sha512'}
 
+    def parse(self, value):
+        parser = ASN1Parser(value)
+
+        cert_id = parser.getChild(0)
+        self.cert_hash_alg = self._hash_algs_OIDs[tuple(cert_id.getChild(0).getChild(0).value)]
+        self.cert_issuer_name_hash = cert_id.getChild(1).value
+        self.cert_issuer_key_hash = cert_id.getChild(2).value
+        self.cert_serial_num = bytesToNumber(cert_id.getChild(3).value)
+
+        cert_status = parser.getChild(1)
+        if cert_status.type == 0:
+            self.cert_status = CertStatus.good
+        elif cert_status.type == 1:
+            self.cert_status = CertStatus.revoked
+        elif cert_status.type == 2:
+            self.cert_status = CertStatus.unknown
+
+        self.this_update = parser.getChild(2).value
+
+        if len(parser.children) > 3:
+            self.next_update = parser.getChild(3).getChild(0).value
+
 
 class OCSPResponse(SignedObject):
     """ This class represents an OCSP response. """
