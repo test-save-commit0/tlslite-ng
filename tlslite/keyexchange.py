@@ -36,7 +36,7 @@ class KeyExchange(object):
         handshake. If the key exchange method does not send ServerKeyExchange
         (e.g. RSA), it returns None.
         """
-        pass
+        raise NotImplementedError("Subclasses must implement this method")
 
     def makeClientKeyExchange(self):
         """
@@ -45,7 +45,7 @@ class KeyExchange(object):
         Returns a ClientKeyExchange for the second flight from client in the
         handshake.
         """
-        pass
+        raise NotImplementedError("Subclasses must implement this method")
 
     def processClientKeyExchange(self, clientKeyExchange):
         """
@@ -54,23 +54,35 @@ class KeyExchange(object):
         Processes the client's ClientKeyExchange message and returns the
         premaster secret. Raises TLSLocalAlert on error.
         """
-        pass
+        raise NotImplementedError("Subclasses must implement this method")
 
     def processServerKeyExchange(self, srvPublicKey, serverKeyExchange):
         """Process the server KEX and return premaster secret"""
-        pass
+        raise NotImplementedError("Subclasses must implement this method")
 
     def _tls12_sign_dsa_SKE(self, serverKeyExchange, sigHash=None):
         """Sign a TLSv1.2 SKE message."""
-        pass
+        if not self.privateKey:
+            raise TLSInternalError("No private key to sign SKE")
+        return self.privateKey.sign(serverKeyExchange.hash(sigHash))
 
     def _tls12_sign_eddsa_ske(self, server_key_exchange, sig_hash):
         """Sign a TLSv1.2 SKE message."""
-        pass
+        if not self.privateKey:
+            raise TLSInternalError("No private key to sign SKE")
+        return self.privateKey.sign(server_key_exchange.hash(sig_hash))
 
     def _tls12_signSKE(self, serverKeyExchange, sigHash=None):
         """Sign a TLSv1.2 SKE message."""
-        pass
+        if self.privateKey.key_type == "rsa":
+            return self.privateKey.sign(serverKeyExchange.hash(sigHash),
+                                        padding="pkcs1",
+                                        hashAlg=sigHash)
+        elif self.privateKey.key_type == "ecdsa":
+            return self.privateKey.sign(serverKeyExchange.hash(sigHash),
+                                        hashAlg=sigHash)
+        else:
+            raise TLSInternalError("Unsupported key type for TLS 1.2 signing")
 
     def signServerKeyExchange(self, serverKeyExchange, sigHash=None):
         """
@@ -79,19 +91,36 @@ class KeyExchange(object):
         :type sigHash: str
         :param sigHash: name of the signature hash to be used for signing
         """
-        pass
+        if self.version >= (3, 3):
+            return self._tls12_signSKE(serverKeyExchange, sigHash)
+        else:
+            return self.privateKey.sign(serverKeyExchange.hash())
 
     @staticmethod
     def _tls12_verify_eddsa_ske(server_key_exchange, public_key,
         client_random, server_random, valid_sig_algs):
         """Verify SeverKeyExchange messages with EdDSA signatures."""
-        pass
+        signature = server_key_exchange.signature
+        sig_alg = server_key_exchange.signatureAlgorithm
+        if sig_alg not in valid_sig_algs:
+            raise TLSIllegalParameterException("Invalid signature algorithm")
+        hash_name = HashAlgorithm.toRepr(sig_alg[1])
+        verify_bytes = server_key_exchange.hash(hash_name)
+        return public_key.verify(signature, verify_bytes)
 
     @staticmethod
     def _tls12_verify_SKE(serverKeyExchange, publicKey, clientRandom,
         serverRandom, validSigAlgs):
         """Verify TLSv1.2 version of SKE."""
-        pass
+        signature = serverKeyExchange.signature
+        if not signature:
+            raise TLSIllegalParameterException("No signature")
+        hashAlg = serverKeyExchange.hashAlg
+        sigAlg = serverKeyExchange.signAlg
+        if (hashAlg, sigAlg) not in validSigAlgs:
+            raise TLSIllegalParameterException("Invalid signature algorithm")
+        hashName = HashAlgorithm.toRepr(hashAlg)
+        return publicKey.verify(signature, serverKeyExchange.hash(hashName))
 
     @staticmethod
     def verifyServerKeyExchange(serverKeyExchange, publicKey, clientRandom,
@@ -100,14 +129,43 @@ class KeyExchange(object):
 
         the only acceptable signature algorithms are specified by validSigAlgs
         """
-        pass
+        if serverKeyExchange.version >= (3, 3):
+            return KeyExchange._tls12_verify_SKE(serverKeyExchange, publicKey,
+                clientRandom, serverRandom, validSigAlgs)
+        else:
+            return publicKey.verify(serverKeyExchange.signature,
+                                    serverKeyExchange.hash())
 
     @staticmethod
     def calcVerifyBytes(version, handshakeHashes, signatureAlg,
         premasterSecret, clientRandom, serverRandom, prf_name=None,
         peer_tag=b'client', key_type='rsa'):
         """Calculate signed bytes for Certificate Verify"""
-        pass
+        if version == (3, 0):
+            return handshakeHashes.digestSSL(premasterSecret, peer_tag)
+        elif version in ((3, 1), (3, 2)):
+            return handshakeHashes.digest()
+        elif version >= (3, 3):
+            if not prf_name:
+                raise ValueError("prf_name not specified")
+            sig_scheme = SignatureScheme.toRepr(signatureAlg)
+            if sig_scheme in ('rsa_pss_rsae_sha256',
+                              'rsa_pss_pss_sha256'):
+                hash_name = "sha256"
+            elif sig_scheme in ('rsa_pss_rsae_sha384',
+                                'rsa_pss_pss_sha384'):
+                hash_name = "sha384"
+            elif sig_scheme in ('rsa_pss_rsae_sha512',
+                                'rsa_pss_pss_sha512'):
+                hash_name = "sha512"
+            else:
+                hash_name = HashAlgorithm.toRepr(signatureAlg[1])
+            verify_bytes = bytearray(b'\x20' * 64 + peer_tag +
+                                     b'\x20' * 64)
+            verify_bytes += handshakeHashes.digest(hash_name)
+            return verify_bytes
+        else:
+            raise ValueError("Unknown SSL/TLS version")
 
     @staticmethod
     def makeCertificateVerify(version, handshakeHashes, validSigAlgs,
@@ -127,7 +185,16 @@ class KeyExchange(object):
         :param serverRandom: server provided random value, needed only for
             SSLv3
         """
-        pass
+        signatureAlgorithm = None
+        if version >= (3, 3):
+            signatureAlgorithm = getFirstMatching(validSigAlgs,
+                                                  privateKey.supported_sig_algs)
+            if signatureAlgorithm is None:
+                raise TLSInternalError("No supported signature algorithm")
+        verifyBytes = KeyExchange.calcVerifyBytes(version, handshakeHashes,
+            signatureAlgorithm, premasterSecret, clientRandom, serverRandom)
+        signature = privateKey.sign(verifyBytes)
+        return CertificateVerify(version, signatureAlgorithm, signature)
 
 
 class AuthenticatedKeyExchange(KeyExchange):
