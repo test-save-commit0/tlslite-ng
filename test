@@ -1,6 +1,11 @@
 from tlslite.x509certchain import X509CertChain
 from tlslite.x509 import X509
 from tlslite.utils.pem import parsePemList
+from tlslite.utils.constanttime import (
+    ct_lt_u32, ct_gt_u32, ct_le_u32, ct_lsb_prop_u8, ct_lsb_prop_u16,
+    ct_isnonzero_u32, ct_neq_u32, ct_eq_u32, ct_check_cbc_mac_and_pad,
+    ct_compare_digest
+)
 
 class TestX509CertChain(unittest.TestCase):
     def setUp(self):
@@ -65,6 +70,59 @@ RX+1PTAOF2tc0TK7Gx1WqTbMQ3ZSie6oBNQ8UkHMqLznEt8mZnUMBOXjAqrwq8IJ
         with self.assertRaises(ValueError):
             chain.getFingerprint()
         self.assertIsNone(chain.getTackExt())
+
+class TestConstantTimeFunctions(unittest.TestCase):
+    def test_ct_lt_u32(self):
+        self.assertEqual(ct_lt_u32(5, 10), 1)
+        self.assertEqual(ct_lt_u32(10, 5), 0)
+        self.assertEqual(ct_lt_u32(5, 5), 0)
+
+    def test_ct_gt_u32(self):
+        self.assertEqual(ct_gt_u32(10, 5), 1)
+        self.assertEqual(ct_gt_u32(5, 10), 0)
+        self.assertEqual(ct_gt_u32(5, 5), 0)
+
+    def test_ct_le_u32(self):
+        self.assertEqual(ct_le_u32(5, 10), 1)
+        self.assertEqual(ct_le_u32(5, 5), 1)
+        self.assertEqual(ct_le_u32(10, 5), 0)
+
+    def test_ct_lsb_prop_u8(self):
+        self.assertEqual(ct_lsb_prop_u8(1), 0xFF)
+        self.assertEqual(ct_lsb_prop_u8(2), 0x00)
+
+    def test_ct_lsb_prop_u16(self):
+        self.assertEqual(ct_lsb_prop_u16(1), 0xFFFF)
+        self.assertEqual(ct_lsb_prop_u16(2), 0x0000)
+
+    def test_ct_isnonzero_u32(self):
+        self.assertEqual(ct_isnonzero_u32(0), 0)
+        self.assertEqual(ct_isnonzero_u32(1), 1)
+        self.assertEqual(ct_isnonzero_u32(100), 1)
+
+    def test_ct_neq_u32(self):
+        self.assertEqual(ct_neq_u32(5, 10), 1)
+        self.assertEqual(ct_neq_u32(5, 5), 0)
+
+    def test_ct_eq_u32(self):
+        self.assertEqual(ct_eq_u32(5, 5), 1)
+        self.assertEqual(ct_eq_u32(5, 10), 0)
+
+    def test_ct_check_cbc_mac_and_pad(self):
+        # This is a simplified test. In a real scenario, you'd need to set up
+        # proper HMAC, data, and other parameters.
+        data = bytearray(b'test' + b'\x0c'*12)  # 4 bytes of data + 12 bytes of padding
+        mac = hmac.new(b'key', digestmod='sha256')
+        seqnumBytes = bytearray(8)
+        contentType = 23  # application_data
+        version = (3, 3)  # TLS 1.2
+        
+        result = ct_check_cbc_mac_and_pad(data, mac, seqnumBytes, contentType, version)
+        self.assertFalse(result)  # This should fail as we didn't set up proper HMAC
+
+    def test_ct_compare_digest(self):
+        self.assertTrue(ct_compare_digest(b'same', b'same'))
+        self.assertFalse(ct_compare_digest(b'different', b'strings'))
 
 if __name__ == '__main__':
     unittest.main()
