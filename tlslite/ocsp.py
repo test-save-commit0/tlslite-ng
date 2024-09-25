@@ -63,7 +63,18 @@ class OCSPResponse(SignedObject):
         :type value: stream of bytes
         :param value: An DER-encoded OCSP response
         """
-        pass
+        self.bytes = value
+        parser = ASN1Parser(value)
+
+        self.resp_status = parser.getChild(0).value[0]
+        if self.resp_status != OCSPRespStatus.successful:
+            return
+
+        response_bytes = parser.getChild(1).getChild(0)
+        self.resp_type = response_bytes.getChild(0).value
+        response_data = response_bytes.getChild(1)
+
+        self._tbsdataparse(response_data.value)
 
     def _tbsdataparse(self, value):
         """
@@ -72,4 +83,21 @@ class OCSPResponse(SignedObject):
         :type value: stream of bytes
         :param value: TBS data
         """
-        pass
+        parser = ASN1Parser(value)
+
+        version = parser.getChild(0)
+        if version.value != b'\x00':
+            raise TLSIllegalParameterException("OCSP response version must be v1")
+        self.version = 1
+
+        self.resp_id = parser.getChild(1).value
+        self.produced_at = parser.getChild(2).value
+
+        responses = parser.getChild(3)
+        for response in responses.children:
+            self.responses.append(SingleResponse(response.value))
+
+        if len(parser.children) > 4:
+            certs = parser.getChild(4)
+            for cert in certs.children:
+                self.certs.append(X509().parse(cert.value))
