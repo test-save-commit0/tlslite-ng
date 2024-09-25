@@ -61,11 +61,26 @@ class MessageSocket(RecordLayer):
 
         :rtype: generator
         """
-        pass
+        while True:
+            for result in self.recvRecord():
+                if result in (0, 1):
+                    yield result
+                    continue
+
+                recordHeader, parser = result
+                if recordHeader.type in self.unfragmentedDataTypes:
+                    yield (recordHeader, parser)
+                else:
+                    for message in self.defragmenter.addData(recordHeader.type,
+                                                             parser.bytes):
+                        yield (recordHeader, Parser(message))
 
     def recvMessageBlocking(self):
         """Blocking variant of :py:meth:`recvMessage`."""
-        pass
+        for result in self.recvMessage():
+            if result in (0, 1):
+                continue
+            return result
 
     def flush(self):
         """
@@ -76,11 +91,23 @@ class MessageSocket(RecordLayer):
 
         :rtype: generator
         """
-        pass
+        while self._sendBuffer:
+            if len(self._sendBuffer) > self.recordSize:
+                fragment = self._sendBuffer[:self.recordSize]
+                self._sendBuffer = self._sendBuffer[self.recordSize:]
+            else:
+                fragment = self._sendBuffer
+                self._sendBuffer = bytearray(0)
+
+            for result in self.sendRecord(self._sendBufferType, fragment):
+                yield result
+
+        self._sendBufferType = None
 
     def flushBlocking(self):
         """Blocking variant of :py:meth:`flush`."""
-        pass
+        for _ in self.flush():
+            pass
 
     def queueMessage(self, msg):
         """
@@ -94,11 +121,17 @@ class MessageSocket(RecordLayer):
 
         :rtype: generator
         """
-        pass
+        if self._sendBufferType != msg.contentType:
+            for result in self.flush():
+                yield result
+
+        self._sendBufferType = msg.contentType
+        self._sendBuffer += msg.write()
 
     def queueMessageBlocking(self, msg):
         """Blocking variant of :py:meth:`queueMessage`."""
-        pass
+        for _ in self.queueMessage(msg):
+            pass
 
     def sendMessage(self, msg):
         """
@@ -115,8 +148,12 @@ class MessageSocket(RecordLayer):
 
         :rtype: generator
         """
-        pass
+        for result in self.queueMessage(msg):
+            yield result
+        for result in self.flush():
+            yield result
 
     def sendMessageBlocking(self, msg):
         """Blocking variant of :py:meth:`sendMessage`."""
-        pass
+        self.queueMessageBlocking(msg)
+        self.flushBlocking()
