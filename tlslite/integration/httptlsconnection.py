@@ -87,3 +87,34 @@ class HTTPTLSConnection(httplib.HTTPConnection, ClientHelper):
         ClientHelper.__init__(self, username, password, certChain,
                               privateKey, checker, settings, anon, host)
         self.tlsConnection = None
+
+    def connect(self):
+        """Connect to a host on a given (SSL) port."""
+        httplib.HTTPConnection.connect(self)
+        
+        self.sock = TLSConnection(self.sock)
+        
+        try:
+            self.start_tls()
+            self.tlsConnection = self.sock
+        except:
+            self.close()
+            raise
+
+    def close(self):
+        """Close the connection to the HTTP server."""
+        if self.tlsConnection:
+            self.tlsConnection.close()
+        httplib.HTTPConnection.close(self)
+
+    def send(self, data):
+        """Send `data` to the server."""
+        if self.tlsConnection:
+            self.tlsConnection.send(data)
+        else:
+            httplib.HTTPConnection.send(self, data)
+
+    def _tunnel(self):
+        """Set up the tunnel to the server."""
+        self.connect()
+        httplib.HTTPConnection._tunnel(self)
