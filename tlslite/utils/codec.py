@@ -25,20 +25,20 @@ class Writer(object):
 
     def addOne(self, val):
         """Add a single-byte wide element to buffer, see add()."""
-        pass
+        self.bytes += struct.pack('>B', val)
     if sys.version_info < (2, 7):
 
         def addTwo(self, val):
             """Add a double-byte wide element to buffer, see add()."""
-            pass
+            self.bytes += struct.pack('>H', val)
 
         def addThree(self, val):
             """Add a three-byte wide element to buffer, see add()."""
-            pass
+            self.bytes += struct.pack('>I', val)[1:]
 
         def addFour(self, val):
             """Add a four-byte wide element to buffer, see add()."""
-            pass
+            self.bytes += struct.pack('>I', val)
     else:
 
         def addTwo(self, val):
@@ -67,7 +67,7 @@ class Writer(object):
             :type length: int
             :param length: number of bytes to use for encoding the value
             """
-            pass
+            self.bytes += x.to_bytes(length, byteorder='big')
     else:
         _addMethods = {(1): addOne, (2): addTwo, (3): addThree, (4): addFour}
 
@@ -84,7 +84,10 @@ class Writer(object):
             :type length: int
             :param length: number of bytes to use for encoding the value
             """
-            pass
+            if length in self._addMethods:
+                self._addMethods[length](self, x)
+            else:
+                self.bytes += struct.pack('>%dB' % length, *[(x>>(8*i))&0xff for i in reversed(range(length))])
 
     def addFixSeq(self, seq, length):
         """
@@ -99,7 +102,8 @@ class Writer(object):
         :type length: int
         :param length: number of bytes to which encode every element
         """
-        pass
+        for item in seq:
+            self.add(item, length)
     if sys.version_info < (2, 7):
 
         def _addVarSeqTwo(self, seq):
@@ -123,7 +127,9 @@ class Writer(object):
             :param lengthLength: amount of bytes in which to encode the overall
                 length of the array
             """
-            pass
+            self.add(len(seq) * length, lengthLength)
+            for item in seq:
+                self.add(item, length)
     else:
 
         def addVarSeq(self, seq, length, lengthLength):
@@ -162,7 +168,11 @@ class Writer(object):
         :type lengthLength: int
         :param lengthLength: length in bytes of overall length field
         """
-        pass
+        total_length = sum(len(tup) for tup in seq) * length
+        self.add(total_length, lengthLength)
+        for tup in seq:
+            for item in tup:
+                self.add(item, length)
 
     def add_var_bytes(self, data, length_length):
         """
@@ -176,7 +186,8 @@ class Writer(object):
         :param int length_length: size of the field to represent the length
             of the data string
         """
-        pass
+        self.add(len(data), length_length)
+        self.bytes += data
 
 
 class Parser(object):
@@ -228,7 +239,11 @@ class Parser(object):
 
         :rtype: int
         """
-        pass
+        if self.index + length > len(self.bytes):
+            raise DecodeError("Not enough data to read")
+        result = bytes_to_int(self.bytes[self.index:self.index + length])
+        self.index += length
+        return result
 
     def getFixBytes(self, lengthBytes):
         """
@@ -239,11 +254,17 @@ class Parser(object):
 
         :rtype: bytearray
         """
-        pass
+        if self.index + lengthBytes > len(self.bytes):
+            raise DecodeError("Not enough data to read")
+        result = self.bytes[self.index:self.index + lengthBytes]
+        self.index += lengthBytes
+        return result
 
     def skip_bytes(self, length):
         """Move the internal pointer ahead length bytes."""
-        pass
+        if self.index + length > len(self.bytes):
+            raise DecodeError("Not enough data to skip")
+        self.index += length
 
     def getVarBytes(self, lengthLength):
         """
@@ -257,7 +278,8 @@ class Parser(object):
 
         :rtype: bytearray
         """
-        pass
+        length = self.get(lengthLength)
+        return self.getFixBytes(length)
 
     def getFixList(self, length, lengthList):
         """
@@ -271,7 +293,7 @@ class Parser(object):
 
         :rtype: list of int
         """
-        pass
+        return [self.get(length) for _ in range(lengthList)]
 
     def getVarList(self, length, lengthLength):
         """
@@ -285,7 +307,10 @@ class Parser(object):
 
         :rtype: list of int
         """
-        pass
+        listLength = self.get(lengthLength)
+        if listLength % length != 0:
+            raise DecodeError("List length not a multiple of element length")
+        return [self.get(length) for _ in range(listLength // length)]
 
     def getVarTupleList(self, elemLength, elemNum, lengthLength):
         """
@@ -302,7 +327,12 @@ class Parser(object):
 
         :rtype: list of tuple of int
         """
-        pass
+        listLength = self.get(lengthLength)
+        tupleLength = elemLength * elemNum
+        if listLength % tupleLength != 0:
+            raise DecodeError("List length not a multiple of tuple length")
+        numTuples = listLength // tupleLength
+        return [tuple(self.get(elemLength) for _ in range(elemNum)) for _ in range(numTuples)]
 
     def startLengthCheck(self, lengthLength):
         """
@@ -311,7 +341,8 @@ class Parser(object):
         :type lengthLength: int
         :param lengthLength: number of bytes in which the length is encoded
         """
-        pass
+        self.lengthCheck = self.get(lengthLength)
+        self.indexCheck = self.index
 
     def setLengthCheck(self, length):
         """
@@ -320,7 +351,8 @@ class Parser(object):
         :type length: int
         :param length: expected size of parsed struct in bytes
         """
-        pass
+        self.lengthCheck = length
+        self.indexCheck = self.index
 
     def stopLengthCheck(self):
         """
@@ -329,7 +361,8 @@ class Parser(object):
         In case the expected length was mismatched with actual length of
         processed data, raises an exception.
         """
-        pass
+        if self.index - self.indexCheck != self.lengthCheck:
+            raise DecodeError("Length check failed")
 
     def atLengthCheck(self):
         """
@@ -341,8 +374,10 @@ class Parser(object):
         Will raise an exception if overflow occured (amount of data read was
         greater than expected size)
         """
-        pass
+        if self.index - self.indexCheck > self.lengthCheck:
+            raise DecodeError("Length overflow")
+        return self.index - self.indexCheck == self.lengthCheck
 
     def getRemainingLength(self):
         """Return amount of data remaining in struct being parsed."""
-        pass
+        return self.lengthCheck - (self.index - self.indexCheck)
