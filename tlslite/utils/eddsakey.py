@@ -26,7 +26,7 @@ class EdDSAKey(object):
 
         :rtype: bool
         """
-        pass
+        raise NotImplementedError()
 
     def hashAndSign(self, data, rsaScheme=None, hAlg=None, sLen=None):
         """Hash and sign the passed-in bytes.
@@ -49,7 +49,7 @@ class EdDSAKey(object):
         :rtype: bytearray
         :returns: An EdDSA signature on the passed-in data.
         """
-        pass
+        raise NotImplementedError()
 
     def hashAndVerify(self, sig_bytes, data, rsaScheme=None, hAlg=None,
         sLen=None):
@@ -76,7 +76,7 @@ class EdDSAKey(object):
         :rtype: bool
         :returns: Whether the signature matches the passed-in data.
         """
-        pass
+        raise NotImplementedError()
 
     @staticmethod
     def sign(self, bytes, padding=None, hashAlg='sha1', saltLen=None):
@@ -98,7 +98,7 @@ class EdDSAKey(object):
         :type saltLen: int
         :param saltLen: Ignored
         """
-        pass
+        raise NotImplementedError("EdDSA does not support pre-hash signatures. Use hashAndSign instead.")
 
     @staticmethod
     def verify(self, sigBytes, bytes, padding=None, hashAlg=None, saltLen=None
@@ -118,7 +118,7 @@ class EdDSAKey(object):
         :type padding: str
         :param padding: Ignored
         """
-        pass
+        raise NotImplementedError("EdDSA does not support pre-hash signatures. Use hashAndVerify instead.")
 
     def acceptsPassword(self):
         """Return True if the write() method accepts a password for use
@@ -126,7 +126,7 @@ class EdDSAKey(object):
 
         :rtype: bool
         """
-        pass
+        return False
 
     def write(self, password=None):
         """Return a string containing the key.
@@ -135,7 +135,7 @@ class EdDSAKey(object):
         :returns: A string describing the key, in whichever format (PEM)
             is native to the implementation.
         """
-        pass
+        raise NotImplementedError()
 
     @staticmethod
     def generate(bits):
@@ -143,4 +143,4 @@ class EdDSAKey(object):
 
         :rtype: ~tlslite.utils.EdDSAKey.EdDSAKey
         """
-        pass
+        raise NotImplementedError()
