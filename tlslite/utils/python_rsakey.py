@@ -57,11 +57,11 @@ class Python_RSAKey(RSAKey):
         Does the key has the associated private key (True) or is it only
         the public part (False).
         """
-        pass
+        return self.d != 0
 
     def acceptsPassword(self):
         """Does it support encrypted key files."""
-        pass
+        return True
 
     @staticmethod
     def generate(bits, key_type='rsa'):
@@ -69,10 +69,72 @@ class Python_RSAKey(RSAKey):
 
         key_type can be "rsa" for a universal rsaEncryption key or
         "rsa-pss" for a key that can be used only for RSASSA-PSS."""
-        pass
+        if key_type not in ('rsa', 'rsa-pss'):
+            raise ValueError("key_type must be 'rsa' or 'rsa-pss'")
+
+        def getPrime(bits):
+            while True:
+                n = getRandomNumber(bits)
+                if isPrime(n):
+                    return n
+
+        # Generate p and q
+        p = getPrime(bits // 2)
+        q = getPrime(bits // 2)
+        n = p * q
+
+        # Ensure p * q has the correct number of bits
+        while n.bit_length() != bits:
+            p = getPrime(bits // 2)
+            q = getPrime(bits // 2)
+            n = p * q
+
+        # Calculate Euler's totient function
+        phi = (p - 1) * (q - 1)
+
+        # Choose e
+        e = 65537  # Commonly used value for e
+
+        # Calculate d
+        d = invMod(e, phi)
+
+        # Calculate additional CRT values
+        dP = d % (p - 1)
+        dQ = d % (q - 1)
+        qInv = invMod(q, p)
+
+        return Python_RSAKey(n, e, d, p, q, dP, dQ, qInv, key_type)
 
     @staticmethod
     @deprecated_params({'data': 's', 'password_callback': 'passwordCallback'})
     def parsePEM(data, password_callback=None):
         """Parse a string containing a PEM-encoded <privateKey>."""
-        pass
+        from .pem import parsePEM
+        from .asn1parser import ASN1Parser
+
+        # Parse the PEM data
+        pemType, pemBytes = parsePEM(data, password_callback)
+
+        # Check if it's an RSA private key
+        if pemType != "PRIVATE KEY" and pemType != "RSA PRIVATE KEY":
+            raise ValueError("Not a valid RSA private key PEM file")
+
+        # Parse the ASN.1 structure
+        parser = ASN1Parser(pemBytes)
+
+        # Extract key components
+        version = parser.getChild(0).value[0]
+        if version != 0:
+            raise ValueError("Unsupported RSA private key version")
+
+        n = parser.getChild(1).value
+        e = parser.getChild(2).value
+        d = parser.getChild(3).value
+        p = parser.getChild(4).value
+        q = parser.getChild(5).value
+        dP = parser.getChild(6).value
+        dQ = parser.getChild(7).value
+        qInv = parser.getChild(8).value
+
+        # Create and return the RSA key
+        return Python_RSAKey(n, e, d, p, q, dP, dQ, qInv)
