@@ -101,4 +101,26 @@ class ClientHelper(object):
     @staticmethod
     def _isIP(address):
         """Return True if the address is an IPv4 address"""
-        pass
+        try:
+            # Split the address into octets
+            octets = address.split('.')
+            
+            # Check if we have exactly 4 octets
+            if len(octets) != 4:
+                return False
+            
+            # Check each octet
+            for octet in octets:
+                # Convert to integer
+                num = int(octet)
+                # Check if it's between 0 and 255
+                if num < 0 or num > 255:
+                    return False
+                # Check if it doesn't have leading zeros (except for 0)
+                if len(octet) > 1 and octet[0] == '0':
+                    return False
+            
+            return True
+        except ValueError:
+            # If we can't convert to int, it's not a valid IP
+            return False
