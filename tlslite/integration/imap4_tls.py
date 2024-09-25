@@ -76,4 +76,13 @@ class IMAP4_TLS(IMAP4, ClientHelper):
         This connection will be used by the routines:
         read, readline, send, shutdown.
         """
-        pass
+        self.host = host
+        self.port = port
+        self.timeout = timeout
+        
+        sock = socket.create_connection((host, port), timeout)
+        self.sock = TLSConnection(sock)
+        
+        self._handshake()
+        
+        self.file = self.sock.makefile('rb')
