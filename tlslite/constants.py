@@ -14,7 +14,10 @@ class TLSEnum(object):
     @classmethod
     def _recursiveVars(cls, klass):
         """Call vars recursively on base classes"""
-        pass
+        attributes = vars(klass)
+        for base in klass.__bases__:
+            attributes.update(cls._recursiveVars(base))
+        return attributes
 
     @classmethod
     def toRepr(cls, value, blacklist=None):
@@ -23,12 +26,21 @@ class TLSEnum(object):
 
         name if found, None otherwise
         """
-        pass
+        if blacklist is None:
+            blacklist = []
+        for name, val in cls._recursiveVars(cls).items():
+            if val == value and name not in blacklist:
+                return name
+        return None
 
     @classmethod
     def toStr(cls, value, blacklist=None):
         """Convert numeric type to human-readable string if possible"""
-        pass
+        name = cls.toRepr(value, blacklist)
+        if name is None:
+            return str(value)
+        else:
+            return name
 
 
 class CertificateType(TLSEnum):
@@ -203,17 +215,30 @@ class SignatureScheme(TLSEnum):
 
         E.g. for "rsa_pkcs1_sha1" it returns "rsa"
         """
-        pass
+        scheme_name = SignatureScheme.toRepr(scheme)
+        if scheme_name:
+            return scheme_name.split('_')[0]
+        return None
 
     @staticmethod
     def getPadding(scheme):
         """Return the name of padding scheme used in signature scheme."""
-        pass
+        scheme_name = SignatureScheme.toRepr(scheme)
+        if scheme_name:
+            parts = scheme_name.split('_')
+            if len(parts) > 1:
+                return parts[1]
+        return None
 
     @staticmethod
     def getHash(scheme):
         """Return the name of hash used in signature scheme."""
-        pass
+        scheme_name = SignatureScheme.toRepr(scheme)
+        if scheme_name:
+            parts = scheme_name.split('_')
+            if len(parts) > 2:
+                return parts[-1]
+        return None
 
 
 class AlgorithmOID(TLSEnum):
@@ -986,24 +1011,46 @@ class CipherSuite:
     @staticmethod
     def filterForVersion(suites, minVersion, maxVersion):
         """Return a copy of suites without ciphers incompatible with version"""
-        pass
+        return [suite for suite in suites if minVersion <= suite <= maxVersion]
 
     @staticmethod
     def filter_for_certificate(suites, cert_chain):
         """Return a copy of suites without ciphers incompatible with the cert.
         """
-        pass
+        if not cert_chain:
+            return []
+        
+        cert_type = cert_chain.getEndEntityPublicKey().key_type
+        
+        compatible_suites = []
+        for suite in suites:
+            if cert_type == "rsa" and "RSA" in CipherSuite.ietfNames[suite]:
+                compatible_suites.append(suite)
+            elif cert_type == "ecdsa" and "ECDSA" in CipherSuite.ietfNames[suite]:
+                compatible_suites.append(suite)
+        
+        return compatible_suites
 
     @staticmethod
     def filter_for_prfs(suites, prfs):
         """Return a copy of suites without ciphers incompatible with the
         specified prfs (sha256 or sha384)"""
-        pass
+        compatible_suites = []
+        for suite in suites:
+            suite_name = CipherSuite.ietfNames[suite]
+            if "SHA256" in suite_name and "sha256" in prfs:
+                compatible_suites.append(suite)
+            elif "SHA384" in suite_name and "sha384" in prfs:
+                compatible_suites.append(suite)
+        return compatible_suites
 
     @classmethod
     def getTLS13Suites(cls, settings, version=None):
         """Return cipher suites that are TLS 1.3 specific."""
-        pass
+        suites = cls.tls13Suites[:]
+        if version:
+            suites = cls.filterForVersion(suites, version, version)
+        return suites
     srpSuites = []
     srpSuites.append(TLS_SRP_SHA_WITH_AES_256_CBC_SHA)
     srpSuites.append(TLS_SRP_SHA_WITH_AES_128_CBC_SHA)
@@ -1162,12 +1209,22 @@ class CipherSuite:
     @staticmethod
     def canonicalCipherName(ciphersuite):
         """Return the canonical name of the cipher whose number is provided."""
-        pass
+        name = CipherSuite.ietfNames.get(ciphersuite)
+        if name:
+            parts = name.split('_')
+            if len(parts) >= 4:
+                return parts[3].lower()
+        return None
 
     @staticmethod
     def canonicalMacName(ciphersuite):
         """Return the canonical name of the MAC whose number is provided."""
-        pass
+        name = CipherSuite.ietfNames.get(ciphersuite)
+        if name:
+            parts = name.split('_')
+            if len(parts) >= 5:
+                return parts[4].lower()
+        return None
 
 
 class Fault:
