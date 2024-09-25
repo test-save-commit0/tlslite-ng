@@ -82,44 +82,59 @@ class TLSAsyncioDispatcherMixIn(asyncio.Protocol):
 
     def _get_sibling_class(self):
         """Get the sibling class that this class is mixed in with."""
-        pass
+        for base in self.__class__.__bases__:
+            if base is not TLSAsyncioDispatcherMixIn:
+                return base
+        return None
 
     def readable(self):
         """Check if the protocol is ready for reading."""
-        pass
+        return self.tls_connection.recv_buffer_size() > 0
 
     def writable(self):
         """Check if the protocol is ready for writing."""
-        pass
+        return self.tls_connection.send_buffer_size() > 0
 
     def handle_read(self):
         """Handle a read event."""
-        pass
+        try:
+            data = self.tls_connection.recv(16384)
+            if data:
+                self.sibling_class.data_received(self, data)
+        except Exception as e:
+            self.close()
 
     def handle_write(self):
         """Handle a write event."""
-        pass
+        try:
+            sent = self.tls_connection.send(b'')
+            if sent == 0:
+                self.sibling_class.pause_writing(self)
+        except Exception as e:
+            self.close()
 
     def out_connect_event(self):
         """Handle an outgoing connect event."""
-        pass
+        self.sibling_class.connection_made(self, self.tls_connection)
 
     def out_close_event(self):
         """Handle an outgoing close event."""
-        pass
+        self.sibling_class.connection_lost(self, None)
 
     def out_read_event(self, read_buffer):
         """Handle an outgoing read event."""
-        pass
+        self.sibling_class.data_received(self, read_buffer)
 
     def out_write_event(self):
         """Handle an outgoing write event."""
-        pass
+        self.sibling_class.resume_writing(self)
 
     def recv(self, buffer_size=16384):
         """Receive data."""
-        pass
+        return self.tls_connection.recv(buffer_size)
 
     def close(self):
         """Close the connection."""
-        pass
+        if self.tls_connection:
+            self.tls_connection.close()
+        self.sibling_class.connection_lost(self, None)
