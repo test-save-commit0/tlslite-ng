@@ -53,7 +53,15 @@ class RecordSocket(object):
         :param data: data to send
         :raises socket.error: when write to socket failed
         """
-        pass
+        while data:
+            try:
+                sent = self.sock.send(data)
+                data = data[sent:]
+            except socket.error as e:
+                if e.errno in (errno.EWOULDBLOCK, errno.EAGAIN):
+                    yield 0
+                else:
+                    raise
 
     def send(self, msg, padding=0):
         """
@@ -65,7 +73,14 @@ class RecordSocket(object):
         :param padding: amount of padding to specify for SSLv2
         :raises socket.error: when write to socket failed
         """
-        pass
+        if self.version == (2, 0):  # SSLv2
+            header = RecordHeader2().create(len(msg), padding)
+        else:
+            header = RecordHeader3().create(self.version, msg.type, len(msg))
+        
+        data = header.write() + msg.write()
+        for result in self._sockSendAll(data):
+            yield result
 
     def _sockRecvAll(self, length):
         """
@@ -76,11 +91,35 @@ class RecordSocket(object):
             blocking and would block and bytearray in case the read finished
         :raises TLSAbruptCloseError: when the socket closed
         """
-        pass
+        buf = bytearray(0)
+        while len(buf) < length:
+            try:
+                chunk = self.sock.recv(length - len(buf))
+                if not chunk:
+                    raise TLSAbruptCloseError()
+                buf += chunk
+            except socket.error as e:
+                if e.errno in (errno.EWOULDBLOCK, errno.EAGAIN):
+                    yield 0
+                else:
+                    raise
+        yield buf
 
     def _recvHeader(self):
         """Read a single record header from socket"""
-        pass
+        if self.version == (2, 0):  # SSLv2
+            header = RecordHeader2()
+            header_len = 2
+        else:
+            header = RecordHeader3()
+            header_len = 5
+
+        for ret in self._sockRecvAll(header_len):
+            if ret in (0, 1):
+                yield ret
+            else:
+                header.parse(ret)
+                yield header
 
     def recv(self):
         """
