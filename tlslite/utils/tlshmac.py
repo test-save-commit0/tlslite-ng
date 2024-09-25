@@ -56,4 +56,18 @@ except Exception:
 
     def new(*args, **kwargs):
         """General constructor that works in FIPS mode."""
-        pass
+        return HMAC(*args, **kwargs)
+
+def compare_digest(a, b):
+    """
+    Compare two digests of equal length in constant time.
+
+    The digests must be of type str/bytes.
+    Returns True if the digests match, and False otherwise.
+    """
+    if len(a) != len(b):
+        return False
+    result = 0
+    for x, y in zip(a, b):
+        result |= x ^ y
+    return result == 0
