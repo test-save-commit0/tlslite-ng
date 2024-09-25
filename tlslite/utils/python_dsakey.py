@@ -49,7 +49,11 @@ class Python_DSAKey(DSAKey):
         :type saltLen: int
         :param saltLen: Ignored, present for API compatibility with RSA
         """
-        pass
+        k = getRandomNumber(1, self.q - 1)
+        r = powMod(self.g, k, self.p) % self.q
+        k_inv = invMod(k, self.q)
+        s = (k_inv * (bytesToNumber(data) + self.private_key * r)) % self.q
+        return encode_sequence(encode_integer(r), encode_integer(s))
 
     def verify(self, signature, hashData, padding=None, hashAlg=None,
         saltLen=None):
@@ -75,4 +79,17 @@ class Python_DSAKey(DSAKey):
         :rtype: bool
         :returns: Whether the signature matches the passed-in data.
         """
-        pass
+        try:
+            signature = bytearray(signature)
+            r, s = remove_integer(remove_integer(remove_sequence(signature)))
+        except ValueError:
+            return False
+
+        if r <= 0 or r >= self.q or s <= 0 or s >= self.q:
+            return False
+
+        w = invMod(s, self.q)
+        u1 = (bytesToNumber(hashData) * w) % self.q
+        u2 = (r * w) % self.q
+        v = ((powMod(self.g, u1, self.p) * powMod(self.public_key, u2, self.p)) % self.p) % self.q
+        return v == r
