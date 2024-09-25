@@ -145,47 +145,48 @@ class TLSRecordLayer(object):
     @property
     def _send_record_limit(self):
         """Maximum size of payload that can be sent."""
-        pass
+        return self._recordLayer.send_record_limit
 
     @_send_record_limit.setter
     def _send_record_limit(self, value):
         """Maximum size of payload that can be sent."""
-        pass
+        self._recordLayer.send_record_limit = value
 
     @property
     def _recv_record_limit(self):
         """Maximum size of payload that can be received."""
-        pass
+        return self._recordLayer.recv_record_limit
 
     @_recv_record_limit.setter
     def _recv_record_limit(self, value):
         """Maximum size of payload that can be received."""
-        pass
+        self._recordLayer.recv_record_limit = value
 
     @property
     def recordSize(self):
         """Maximum size of the records that will be sent out."""
-        pass
+        return self._user_record_limit
 
     @recordSize.setter
     def recordSize(self, value):
         """Size to automatically fragment records to."""
-        pass
+        self._user_record_limit = value
+        self._recordLayer.send_record_limit = min(value, self._send_record_limit)
 
     @property
     def _client(self):
         """Boolean stating if the endpoint acts as a client"""
-        pass
+        return self._recordLayer.client
 
     @_client.setter
     def _client(self, value):
         """Set the endpoint to act as a client or not"""
-        pass
+        self._recordLayer.client = value
 
     @property
     def version(self):
         """Get the SSL protocol version of connection"""
-        pass
+        return self._recordLayer.version
 
     @version.setter
     def version(self, value):
@@ -196,12 +197,12 @@ class TLSRecordLayer(object):
         Don't use it! See at HandshakeSettings for options to set desired
         protocol version.
         """
-        pass
+        self._recordLayer.version = value
 
     @property
     def encryptThenMAC(self):
         """Whether the connection uses Encrypt Then MAC (RFC 7366)"""
-        pass
+        return self._recordLayer.encryptThenMAC
 
     def read(self, max=None, min=1):
         """Read some data from the TLS connection.
@@ -228,7 +229,33 @@ class TLSRecordLayer(object):
             without a preceding alert.
         :raises tlslite.errors.TLSAlert: If a TLS alert is signalled.
         """
-        pass
+        try:
+            if self.closed:
+                raise TLSClosedConnectionError("Attempt to read from closed connection")
+
+            if max is None:
+                max = self._recv_record_limit
+
+            while len(self._buffer) < min:
+                record = self._getNextRecord()
+                if record.contentType == ContentType.application_data:
+                    self._buffer += record.write()
+                elif record.contentType == ContentType.alert:
+                    alert = Alert().parse(record.write())
+                    if alert.level == AlertLevel.warning:
+                        if alert.description == AlertDescription.close_notify:
+                            self.close()
+                    else:
+                        raise TLSAlert(alert.description)
+                else:
+                    self._handle_other_record_types(record)
+
+            result = self._buffer[:max]
+            self._buffer = self._buffer[max:]
+            return result
+        except socket.error:
+            self.close()
+            raise
 
     def readAsync(self, max=None, min=1):
         """Start a read operation on the TLS connection.
@@ -242,7 +269,37 @@ class TLSRecordLayer(object):
         :rtype: iterable
         :returns: A generator; see above for details.
         """
-        pass
+        try:
+            if self.closed:
+                raise TLSClosedConnectionError("Attempt to read from closed connection")
+
+            if max is None:
+                max = self._recv_record_limit
+
+            while len(self._buffer) < min:
+                for result in self._getNextRecordAsync():
+                    if result in (0, 1):
+                        yield result
+                    else:
+                        record = result
+                        if record.contentType == ContentType.application_data:
+                            self._buffer += record.write()
+                        elif record.contentType == ContentType.alert:
+                            alert = Alert().parse(record.write())
+                            if alert.level == AlertLevel.warning:
+                                if alert.description == AlertDescription.close_notify:
+                                    self.close()
+                            else:
+                                raise TLSAlert(alert.description)
+                        else:
+                            self._handle_other_record_types(record)
+
+            result = self._buffer[:max]
+            self._buffer = self._buffer[max:]
+            yield result
+        except socket.error:
+            self.close()
+            raise
 
     def unread(self, b):
         """Add bytes to the front of the socket read buffer for future
@@ -250,7 +307,7 @@ class TLSRecordLayer(object):
         unread the last data from a socket, that won't wake up selected waiters,
         and those waiters may hang forever.
         """
-        pass
+        self._buffer = b + self._buffer
 
     def write(self, s):
         """Write some data to the TLS connection.
