@@ -33,27 +33,43 @@ class Defragmenter(object):
     @deprecated_params({'msg_type': 'msgType'})
     def add_static_size(self, msg_type, size):
         """Add a message type which all messages are of same length"""
-        pass
+        self.priorities.append(msg_type)
+        self.buffers[msg_type] = bytearray()
+        self.decoders[msg_type] = lambda x: len(x) >= size
 
     @deprecated_params({'msg_type': 'msgType', 'size_offset': 'sizeOffset',
         'size_of_size': 'sizeOfSize'})
     def add_dynamic_size(self, msg_type, size_offset, size_of_size):
         """Add a message type which has a dynamic size set in a header"""
-        pass
+        self.priorities.append(msg_type)
+        self.buffers[msg_type] = bytearray()
+        def decoder(x):
+            if len(x) < size_offset + size_of_size:
+                return False
+            size = Parser(x[size_offset:size_offset+size_of_size]).getFixBytes(size_of_size)
+            return len(x) >= size_offset + size_of_size + size
+        self.decoders[msg_type] = decoder
 
     @deprecated_params({'msg_type': 'msgType'})
     def add_data(self, msg_type, data):
         """Adds data to buffers"""
-        pass
+        if msg_type in self.buffers:
+            self.buffers[msg_type].extend(data)
 
     def get_message(self):
         """Extract the highest priority complete message from buffer"""
-        pass
+        for msg_type in self.priorities:
+            if msg_type in self.buffers and self.decoders[msg_type](self.buffers[msg_type]):
+                message = bytes(self.buffers[msg_type])
+                self.buffers[msg_type] = bytearray()
+                return (msg_type, message)
+        return None
 
     def clear_buffers(self):
         """Remove all data from buffers"""
-        pass
+        for msg_type in self.buffers:
+            self.buffers[msg_type] = bytearray()
 
     def is_empty(self):
         """Return True if all buffers are empty."""
-        pass
+        return all(len(buffer) == 0 for buffer in self.buffers.values())
