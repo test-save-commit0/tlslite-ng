@@ -658,8 +658,70 @@ class Rijndael(object):
 
     def encrypt(self, plaintext):
         """Encrypt a single block of plaintext."""
-        pass
+        if len(plaintext) != self.block_size:
+            raise ValueError('wrong block length, expected ' + str(self.block_size) + ' got ' + str(len(plaintext)))
+        
+        Ke = self.Ke
+
+        BC = self.block_size // 4
+        ROUNDS = len(Ke) - 1
+        if BC == 4:
+            SC = 0
+        elif BC == 6:
+            SC = 1
+        else:
+            SC = 2
+        s1 = shifts[SC][1][0]
+        s2 = shifts[SC][2][0]
+        s3 = shifts[SC][3][0]
+        a = [0] * BC
+        t = []
+        for i in range(BC):
+            t.append((plaintext[i * 4] << 24 | plaintext[i * 4 + 1] << 16 | plaintext[i * 4 + 2] << 8 | plaintext[i * 4 + 3]) ^ Ke[0][i])
+        for r in range(1, ROUNDS):
+            for i in range(BC):
+                a[i] = (T1[(t[(i) % BC] >> 24) & 255] ^ T2[(t[(i + s1) % BC] >> 16) & 255] ^ T3[(t[(i + s2) % BC] >> 8) & 255] ^ T4[t[(i + s3) % BC] & 255]) ^ Ke[r][i]
+            t = a.copy()
+        result = []
+        for i in range(BC):
+            tt = Ke[ROUNDS][i]
+            result.append((S[(t[(i) % BC] >> 24) & 255] ^ (tt >> 24)) & 255)
+            result.append((S[(t[(i + s1) % BC] >> 16) & 255] ^ (tt >> 16)) & 255)
+            result.append((S[(t[(i + s2) % BC] >> 8) & 255] ^ (tt >> 8)) & 255)
+            result.append((S[t[(i + s3) % BC] & 255] ^ tt) & 255)
+        return bytes(result)
 
     def decrypt(self, ciphertext):
         """Decrypt a block of ciphertext."""
-        pass
+        if len(ciphertext) != self.block_size:
+            raise ValueError('wrong block length, expected ' + str(self.block_size) + ' got ' + str(len(ciphertext)))
+        
+        Kd = self.Kd
+
+        BC = self.block_size // 4
+        ROUNDS = len(Kd) - 1
+        if BC == 4:
+            SC = 0
+        elif BC == 6:
+            SC = 1
+        else:
+            SC = 2
+        s1 = shifts[SC][1][1]
+        s2 = shifts[SC][2][1]
+        s3 = shifts[SC][3][1]
+        a = [0] * BC
+        t = [0] * BC
+        for i in range(BC):
+            t[i] = (ciphertext[i * 4] << 24 | ciphertext[i * 4 + 1] << 16 | ciphertext[i * 4 + 2] << 8 | ciphertext[i * 4 + 3]) ^ Kd[0][i]
+        for r in range(1, ROUNDS):
+            for i in range(BC):
+                a[i] = (T5[(t[(i) % BC] >> 24) & 255] ^ T6[(t[(i + s1) % BC] >> 16) & 255] ^ T7[(t[(i + s2) % BC] >> 8) & 255] ^ T8[t[(i + s3) % BC] & 255]) ^ Kd[r][i]
+            t = a.copy()
+        result = []
+        for i in range(BC):
+            tt = Kd[ROUNDS][i]
+            result.append((Si[(t[(i) % BC] >> 24) & 255] ^ (tt >> 24)) & 255)
+            result.append((Si[(t[(i + s1) % BC] >> 16) & 255] ^ (tt >> 16)) & 255)
+            result.append((Si[(t[(i + s2) % BC] >> 8) & 255] ^ (tt >> 8)) & 255)
+            result.append((Si[t[(i + s3) % BC] & 255] ^ tt) & 255)
+        return bytes(result)
