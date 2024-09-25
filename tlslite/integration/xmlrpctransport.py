@@ -95,4 +95,23 @@ class XMLRPCTransport(xmlrpclib.Transport, ClientHelper):
 
     def make_connection(self, host):
         """Make a connection to `host`. Reuse keepalive connections."""
-        pass
+        if self.conn_class_is_http:
+            # For Python 2.6 and earlier
+            chost, self._extra_headers, x509 = self.get_host_info(host)
+            return HTTPTLSConnection(chost, None,
+                                     self.username, self.password,
+                                     self.certChain, self.privateKey,
+                                     self.checker, self.settings,
+                                     self.ignoreAbruptClose)
+        else:
+            # For Python 2.7 and later
+            if self._connection and host == self._connection[0]:
+                return self._connection[1]
+            
+            chost, self._extra_headers, x509 = self.get_host_info(host)
+            self._connection = host, HTTPTLSConnection(chost, None,
+                                                       self.username, self.password,
+                                                       self.certChain, self.privateKey,
+                                                       self.checker, self.settings,
+                                                       self.ignoreAbruptClose)
+            return self._connection[1]
